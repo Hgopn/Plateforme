@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>🎬 TikTok Live connecté</title>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <style>
+    body {
+      background: radial-gradient(circle at top, #0d001f, #000);
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 60px;
+    }
+    h1 {
+      color: #a16cff;
+    }
+    #events {
+      margin-top: 40px;
+      font-size: 1.4rem;
+      line-height: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎬 TikTok Live connecté</h1>
+  <p>Les événements TikTok s’afficheront ici 👇</p>
+
+  <div id="events"></div>
+
+  <script>
+    const socket = io.connect();
+
+    socket.on("gift", data => {
+      const div = document.getElementById("events");
+      const msg = `🎁 ${data.user} a envoyé ${data.gift} x${data.repeat}`;
+      const p = document.createElement("p");
+      p.textContent = msg;
+      div.prepend(p);
+    });
+
+    socket.on("like", data => {
+      const div = document.getElementById("events");
+      const msg = `❤️ ${data.user} a envoyé ${data.likes} likes`;
+      const p = document.createElement("p");
+      p.textContent = msg;
+      div.prepend(p);
+    });
+  </script>
+</body>
+</html>

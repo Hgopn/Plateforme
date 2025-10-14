@@ -1,0 +1,8 @@
+cd "$env:USERPROFILE\Desktop\Plateforme"
+
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\venv\Scripts\Activate.ps1
+
+python secret.py
+
+http://localhost:5000/
