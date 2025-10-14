@@ -3,6 +3,8 @@ from flask_socketio import SocketIO
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import GiftEvent, LikeEvent
 import threading
+import eventlet
+import eventlet.wsgi
 
 # ---------------------------
 # ⚙️ CONFIGURATION DE BASE
@@ -49,12 +51,14 @@ def run_tiktok():
     client.run()
 
 # ---------------------------
-# ▶️ LANCEMENT
+# ▶️ LANCEMENT (Render / Eventlet)
 # ---------------------------
 if __name__ == '__main__':
+    # Lance TikTokLive dans un thread séparé
     tiktok_thread = threading.Thread(target=run_tiktok)
     tiktok_thread.daemon = True
     tiktok_thread.start()
 
-    print("✅ Serveur lancé sur http://localhost:5000")
-    socketio.run(app, host="0.0.0.0", port=5000)
+    print("✅ Serveur lancé sur Render avec Eventlet")
+    # Serveur stable et adapté à la production
+    eventlet.wsgi.server(eventlet.listen(('0.0.0.0', 5000)), app)
