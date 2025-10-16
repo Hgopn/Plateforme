@@ -6,3 +6,19 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 python secret.py
 
 http://localhost:5000/
+
+
+https://plateforme-v2.onrender.com/billes
+
+https://plateforme-v2.onrender.com/fakir
+
+https://plateforme-v2.onrender.com/slot
+
+
+=======
+
+cd "$env:USERPROFILE\Desktop\UnisPlay"
+
+
+> Lance l'application 
+npm start
