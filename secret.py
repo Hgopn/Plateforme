@@ -18,9 +18,25 @@ client = TikTokLiveClient(unique_id=TIKTOK_USERNAME)
 # ---------------------------
 # 🧠 ROUTES WEB
 # ---------------------------
+
 @app.route("/")
 def index():
     return render_template("page.html")
+
+# 🎰 Machine à sous
+@app.route("/slot")
+def slot():
+    return render_template("slot.html")
+
+# 🏁 Course de billes
+@app.route("/billes")
+def billes():
+    return render_template("billes.html")
+
+# 🎯 Fakir Drop
+@app.route("/fakir")
+def fakir():
+    return render_template("fakir.html")
 
 # ---------------------------
 # 🎁 ÉVÉNEMENTS TIKTOK
@@ -59,6 +75,6 @@ if __name__ == '__main__':
     tiktok_thread.daemon = True
     tiktok_thread.start()
 
-    print("✅ Serveur lancé sur Render avec Eventlet")
+    print("✅ Serveur lancé sur Render avec Eventlet (port 5000)")
     # Serveur stable et adapté à la production
     eventlet.wsgi.server(eventlet.listen(('0.0.0.0', 5000)), app)
