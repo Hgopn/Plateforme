@@ -57,6 +57,7 @@ def index():
 @app.route("/slot")
 def slot():
     username = request.args.get("username", "inconnu")
+    print(f"🚀 Connexion TikTok demandée pour : {username}")
     create_tiktok_client(username)
     return render_template("slot.html", username=username)
 

@@ -2,15 +2,74 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Machine à Sous - UnisPlay</title>
+  <title>🎰 Machine à Sous - Test Live</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <style>
-    body { background: #0b0b1a; color: white; text-align: center; font-family: Arial; }
-    h1 { color: #00adb5; margin-top: 50px; }
+    body {
+      background: radial-gradient(circle at top, #1a1a2e, #16213e);
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      margin: 0;
+      padding-top: 100px;
+    }
+    h1 { font-size: 2.5em; color: #00adb5; margin-bottom: 10px; }
     p { color: #ccc; }
+    #events {
+      margin-top: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .event {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 10px 20px;
+      border-radius: 8px;
+      width: 400px;
+      text-align: left;
+      box-shadow: 0 0 10px rgba(0,173,181,0.2);
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
-  <h1>🎰 Machine à Sous</h1>
-  <p>Jeu connecté à TikTokLive - Interface en cours...</p>
+  <h1>🎰 Machine à Sous - Live Test</h1>
+  <p>Joueur connecté : <b id="username"></b></p>
+  <div id="events"></div>
+
+  <script>
+    // Récupère le nom du joueur dans l’URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const username = urlParams.get("username") || "inconnu";
+    document.getElementById("username").innerText = username;
+
+    // Connecte Socket.IO au namespace du joueur
+    const socket = io(`/${username}`);
+
+    socket.on("connect", () => {
+      console.log("✅ Connecté au serveur Socket.IO pour " + username);
+    });
+
+    socket.on("gift", data => {
+      addEvent(`🎁 ${data.user} a envoyé ${data.gift} x${data.repeat}`);
+    });
+
+    socket.on("like", data => {
+      addEvent(`❤️ ${data.user} a envoyé ${data.likes} likes`);
+    });
+
+    function addEvent(message) {
+      const div = document.createElement("div");
+      div.className = "event";
+      div.innerText = message;
+      document.getElementById("events").prepend(div);
+    }
+  </script>
 </body>
 </html>
