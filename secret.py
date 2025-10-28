@@ -1,81 +1,81 @@
-from flask import Flask, render_template, request
-from flask_socketio import SocketIO
-from TikTokLive import TikTokLiveClient
-from TikTokLive.events import GiftEvent, LikeEvent
-import threading
-import eventlet
-import eventlet.wsgi
+# =========================================================
+# 🔐 InterArcade Backend — Serveur Flask + Socket.IO
+# Gestion des licences et communication temps réel
+# =========================================================
 
+import eventlet
+eventlet.monkey_patch()  # ⚠️ doit être appelé avant tout autre import
+
+from flask import Flask, request, jsonify
+from flask_socketio import SocketIO
+from flask_cors import CORS
+
+# --- Initialisation ---
 app = Flask(__name__)
+CORS(app)  # autorise les requêtes depuis l'app Electron
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# ---------------------------
-# 🧠 DICTIONNAIRE UTILISATEURS
-# ---------------------------
-clients = {}
+# === MOCK BASE DE LICENCES ===
+# Tu pourras remplacer par une vraie base (SQLite, JSON, etc.)
+# Deux modèles possibles :
+# 1️⃣ clé seule → plan
+# 2️⃣ (pseudo, clé) → plan (clé liée à un pseudo)
+LICENSES = {
+    # modèle 1 (clé seule)
+    "IA-TEST-BASIC": {"plan": "basic"},
+    "IA-TEST-PRO": {"plan": "pro"},
 
-def create_tiktok_client(username):
-    """Crée un client TikTokLive relié à un pseudo donné"""
-    if username in clients:
-        return clients[username]
+    # modèle 2 (clé liée à un pseudo)
+    ("songmicon", "IA-SONGMI-PRO"): {"plan": "pro"}
+}
 
-    client = TikTokLiveClient(unique_id=username)
+# === ROUTES API ===
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
 
-    @client.on(GiftEvent)
-    async def on_gift(event):
-        data = {
-            "user": event.user.unique_id,
-            "gift": event.gift.name,
-            "repeat": event.gift.repeat_count
-        }
-        print(f"🎁 {username}: {data['user']} a envoyé {data['gift']} x{data['repeat']}")
-        socketio.emit("gift", data, namespace=f"/{username}")
 
-    @client.on(LikeEvent)
-    async def on_like(event):
-        data = {
-            "user": event.user.unique_id,
-            "likes": event.likeCount
-        }
-        print(f"❤️ {username}: {data['user']} a envoyé {data['likes']} likes")
-        socketio.emit("like", data, namespace=f"/{username}")
+@app.route("/verify_key", methods=["POST"])
+def verify_key():
+    """
+    Reçoit: { "username": "...", "key": "IA-XXXX-...." }
+    Renvoie:
+      { "status": "authorized", "plan": "pro" } ou { "status": "unauthorized" }
+    """
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    key = (data.get("key") or "").strip()
 
-    t = threading.Thread(target=lambda: client.run())
-    t.daemon = True
-    t.start()
+    if not username or not key:
+        return jsonify({"status": "unauthorized", "reason": "missing"}), 400
 
-    clients[username] = client
-    return client
+    # Vérifie d'abord (pseudo, clé)
+    if (username, key) in LICENSES:
+        plan = LICENSES[(username, key)]["plan"]
+        print(f"✅ Licence valide pour {username} ({plan})")
+        return jsonify({"status": "authorized", "plan": plan})
 
-# ---------------------------
-# 🧩 ROUTES FLASK
-# ---------------------------
-@app.route("/")
-def index():
-    return render_template("page.html")
+    # Sinon vérifie clé seule
+    if key in LICENSES:
+        plan = LICENSES[key]["plan"]
+        print(f"✅ Licence valide ({plan}) pour clé {key}")
+        return jsonify({"status": "authorized", "plan": plan})
 
-@app.route("/slot")
-def slot():
-    username = request.args.get("username", "inconnu")
-    print(f"🚀 Connexion TikTok demandée pour : {username}")
-    create_tiktok_client(username)
-    return render_template("slot.html", username=username)
+    print(f"❌ Licence invalide : {username} / {key}")
+    return jsonify({"status": "unauthorized"}), 200
 
-@app.route("/billes")
-def billes():
-    username = request.args.get("username", "inconnu")
-    create_tiktok_client(username)
-    return render_template("billes.html", username=username)
 
-@app.route("/fakir")
-def fakir():
-    username = request.args.get("username", "inconnu")
-    create_tiktok_client(username)
-    return render_template("fakir.html", username=username)
+# === SOCKET.IO (canal /events) ===
+@socketio.on("connect", namespace="/events")
+def handle_connect():
+    print("🟢 Client connecté à /events")
 
-# ---------------------------
-# 🚀 SERVEUR RENDER
-# ---------------------------
-if __name__ == '__main__':
-    print("✅ Serveur UnisPlay connecté à TikTok en multi-utilisateurs !")
-    eventlet.wsgi.server(eventlet.listen(('0.0.0.0', 5000)), app)
+@socketio.on("disconnect", namespace="/events")
+def handle_disconnect():
+    print("🔴 Client déconnecté de /events")
+
+
+# === Lancement du serveur ===
+if __name__ == "__main__":
+    print("🚀 Serveur InterArcade prêt sur http://0.0.0.0:5000")
+    socketio.run(app, host="0.0.0.0", port=5000)

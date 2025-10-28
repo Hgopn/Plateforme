@@ -17,7 +17,11 @@ https://plateforme-v2.onrender.com/slot
 
 =======
 
-cd "$env:USERPROFILE\Desktop\UnisPlay"
+cd "$env:USERPROFILE\Desktop\InterArcade_site"
+
+cd "$env:USERPROFILE\Desktop\InterArcade"
+
+cd "$env:USERPROFILE\Desktop\Plateforme"
 
 
 > Lance l'application 
@@ -30,3 +34,9 @@ npm start
 GITHUB
 
 https://dashboard.render.com/web/srv-d3nsigmuk2gs73ecigj0/logs
+
+
+=====
+
+
+MON SITE : https://interarcade.onrender.com/
