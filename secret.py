@@ -35,7 +35,14 @@ def health():
     return jsonify({"status": "ok"})
 
 
-@app.route("/verify_key", methods=["POST"])
+@app.route("/verify_key", methods=["GET", "POST"])
+if request.method == "GET":
+    username = request.args.get("username", "").strip()
+    key = request.args.get("key", "").strip()
+else:
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    key = (data.get("key") or "").strip()
 def verify_key():
     """
     Reçoit: { "username": "...", "key": "IA-XXXX-...." }
