@@ -16,6 +16,7 @@ try:
     print("🟢 Connecté à Render via Socket.IO")
 except Exception as e:
     print("❌ Impossible de se connecter à Render:", e)
+    print(f"🔗 Tentative connexion Socket.IO vers {BACKEND_URL}")
 
 # === Connexion TikTok ===
 client = TikTokLiveClient(unique_id=USERNAME)

@@ -1,10 +1,6 @@
-# ======================================================
 # ✅ secret.py — Serveur Flask / Socket.IO / Licences InterArcade
-# ======================================================
-
-# ⚠️ Monkey patch AVANT TOUS LES AUTRES IMPORTS
 import eventlet
-eventlet.monkey_patch()
+eventlet.monkey_patch()  # ⚠️ doit être tout en haut
 
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
@@ -46,8 +42,7 @@ def verify_key():
 @socketio.on("tiktok_event")
 def handle_tiktok_event(data):
     print(f"📡 Événement TikTokLive reçu : {data}")
-    # On renvoie à tous les clients connectés
-    socketio.emit("ia:event", data)
+    socketio.emit("ia:event", data, broadcast=True)  # 🔥 diffuse à tous les clients connectés
 
 # === LANCEMENT SERVEUR ===
 if __name__ == "__main__":
