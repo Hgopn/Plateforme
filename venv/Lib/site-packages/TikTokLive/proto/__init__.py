@@ -1,1 +1,2 @@
-# protoc -I. --python_out=. ./tiktok_schema.proto
+from .tiktok_proto import *
+from .custom_proto import *
