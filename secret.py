@@ -44,6 +44,20 @@ def handle_tiktok_event(data):
     print(f"📡 Événement TikTokLive reçu : {data}")
     socketio.emit("ia:event", data, broadcast=True)  # 🔥 diffuse à tous les clients connectés
 
+# === 🔬 ROUTE DE TEST MANUEL (pour vérifier Render → InterArcade) ===
+@app.route("/test_emit")
+def test_emit():
+    """Permet de tester l'envoi manuel d'un événement vers InterArcade"""
+    data = {
+        "type": "gift",
+        "username": "test_user",
+        "gift": "Rose",
+        "count": 1
+    }
+    print(f"🧪 Test manuel envoyé : {data}")
+    socketio.emit("ia:event", data, broadcast=True)
+    return jsonify({"status": "ok", "sent": data})
+
 # === LANCEMENT SERVEUR ===
 if __name__ == "__main__":
     print("🚀 Serveur InterArcade prêt sur http://0.0.0.0:5000")
