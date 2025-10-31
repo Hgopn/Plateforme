@@ -42,7 +42,7 @@ def verify_key():
 @socketio.on("tiktok_event")
 def handle_tiktok_event(data):
     print(f"📡 Événement TikTokLive reçu : {data}")
-    socketio.emit("ia:event", data, broadcast=True)  # 🔥 diffuse à tous les clients connectés
+    socketio.emit("ia:event", data)  # ✅ broadcast automatique (pas besoin du flag)
 
 # === 🔬 ROUTE DE TEST MANUEL (pour vérifier Render → InterArcade) ===
 @app.route("/test_emit")
@@ -55,7 +55,7 @@ def test_emit():
         "count": 1
     }
     print(f"🧪 Test manuel envoyé : {data}")
-    socketio.emit("ia:event", data, broadcast=True)
+    socketio.emit("ia:event", data)  # ✅ suppression de broadcast=True
     return jsonify({"status": "ok", "sent": data})
 
 # === LANCEMENT SERVEUR ===
