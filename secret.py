@@ -1,6 +1,6 @@
-# ✅ secret.py — Serveur Flask / Socket.IO / Licences InterArcade (stabilisé Render)
+# ✅ secret.py — Version publique Render stable (InterArcade Cloud)
 import eventlet
-eventlet.monkey_patch()  # ⚠️ doit être tout en haut
+eventlet.monkey_patch()
 
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
@@ -8,9 +8,7 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
-
-# 🔧 IMPORTANT : async_mode="eventlet" + log désactivés
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet", logger=False, engineio_logger=False)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 # === LICENCES ===
 LICENSES = {
@@ -19,7 +17,6 @@ LICENSES = {
     ("songmicon", "IA-SONGMI-PRO"): {"plan": "pro"},
 }
 
-# === ROUTES ===
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
@@ -39,29 +36,20 @@ def verify_key():
         return jsonify({"status": "authorized", "plan": LICENSES[key]["plan"]})
     return jsonify({"status": "unauthorized"}), 200
 
-
-# === ÉVÉNEMENTS SOCKET.IO (TikTok → InterArcade) ===
+# === RÉCEPTION D'ÉVÉNEMENTS TIKTOK ===
 @socketio.on("tiktok_event")
 def handle_tiktok_event(data):
     print(f"📡 Événement TikTokLive reçu : {data}")
-    socketio.emit("ia:event", data)  # ✅ diffuse à tous les clients connectés
+    socketio.emit("ia:event", data)  # ✅ relai global sans broadcast
 
-
-# === ROUTE DE TEST / DEBUG ===
-@app.route("/test_emit", methods=["GET"])
+@app.route("/test_emit")
 def test_emit():
-    data = {
-        "type": "gift",
-        "username": "test_user",
-        "gift": "Rose",
-        "count": 1
-    }
+    """Test manuel pour vérifier Render → InterArcade"""
+    data = {"type": "gift", "username": "test_user", "gift": "Rose", "count": 1}
     print(f"🧪 Test manuel envoyé : {data}")
     socketio.emit("ia:event", data)
     return jsonify({"status": "ok", "sent": data})
 
-
-# === LANCEMENT ===
 if __name__ == "__main__":
-    print("🚀 Serveur InterArcade prêt sur http://0.0.0.0:5000")
+    print("🚀 Serveur InterArcade Cloud prêt sur http://0.0.0.0:5000")
     socketio.run(app, host="0.0.0.0", port=5000)
