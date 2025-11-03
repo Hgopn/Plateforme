@@ -1,4 +1,4 @@
-# tiktok_listener.py
+# tiktok_listener.py — version stable finale (TikTok → Render → InterArcade)
 
 import asyncio
 import socketio
@@ -11,12 +11,18 @@ BACKEND_URL = "https://plateforme-v2.onrender.com"
 
 # === Connexion Socket.IO vers Render ===
 sio = socketio.Client()
-try:
-    sio.connect(BACKEND_URL)
-    print("🟢 Connecté à Render via Socket.IO")
-except Exception as e:
-    print("❌ Impossible de se connecter à Render:", e)
-    print(f"🔗 Tentative connexion Socket.IO vers {BACKEND_URL}")
+
+async def connect_socket():
+    """Connexion robuste à Render"""
+    connected = False
+    while not connected:
+        try:
+            sio.connect(BACKEND_URL, transports=["websocket"])
+            print(f"🟢 Connecté à Render ({BACKEND_URL}) via Socket.IO")
+            connected = True
+        except Exception as e:
+            print(f"❌ Échec connexion Render: {e}")
+            await asyncio.sleep(5)
 
 # === Connexion TikTok ===
 client = TikTokLiveClient(unique_id=USERNAME)
@@ -38,10 +44,12 @@ async def on_gift(event: GiftEvent):
         "gift": event.gift.name,
         "count": event.repeat_count,
         "streaking": event.repeat_end
-        # ❌ 'timestamp' retiré (non présent dans cette version)
     }
     print(f"🎁 Cadeau reçu: {data}")
-    sio.emit("tiktok_event", data)
+    try:
+        sio.emit("tiktok_event", data)
+    except Exception as e:
+        print(f"⚠️ Erreur lors de l’émission Socket.IO: {e}")
 
 @client.on(LikeEvent)
 async def on_like(event: LikeEvent):
@@ -63,13 +71,16 @@ async def on_comment(event: CommentEvent):
     print(f"💬 Commentaire reçu: {data}")
     sio.emit("tiktok_event", data)
 
-# === BOUCLE DE CONNEXION AUTOMATIQUE ===
+# === BOUCLE PRINCIPALE ===
 async def run_client():
+    # 1️⃣ Connexion à Render
+    await connect_socket()
+
+    # 2️⃣ Connexion continue à TikTok
     while True:
         try:
             print(f"🚀 Connexion au live TikTok de @{USERNAME} ...")
             await client.connect()
-            # ⏳ Remplace _connected_future par une boucle d’attente tant que connecté
             while getattr(client, "connected", True):
                 await asyncio.sleep(2)
         except UserOfflineError:

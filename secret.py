@@ -1,6 +1,6 @@
 # ✅ secret.py — Serveur Flask / Socket.IO / Licences InterArcade
 import eventlet
-eventlet.monkey_patch()  # ⚠️ doit être tout en haut
+eventlet.monkey_patch()  # ⚠️ doit être tout en haut avant tout import
 
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO
@@ -18,7 +18,7 @@ LICENSES = {
     ("songmicon", "IA-SONGMI-PRO"): {"plan": "pro"},
 }
 
-# === ROUTES ===
+# === ROUTES DE TEST ET DE LICENCE ===
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
@@ -38,13 +38,24 @@ def verify_key():
         return jsonify({"status": "authorized", "plan": LICENSES[key]["plan"]})
     return jsonify({"status": "unauthorized"}), 200
 
-# === RÉCEPTION D'ÉVÉNEMENTS TIKTOK ===
+
+# === SOCKET.IO ÉVÉNEMENTS ===
+@socketio.on("connect")
+def on_connect():
+    print("✅ Nouveau client connecté au Socket.IO")
+
+@socketio.on("disconnect")
+def on_disconnect():
+    print("❌ Client déconnecté du Socket.IO")
+
 @socketio.on("tiktok_event")
 def handle_tiktok_event(data):
     print(f"📡 Événement TikTokLive reçu : {data}")
-    socketio.emit("ia:event", data)  # ✅ broadcast automatique (pas besoin du flag)
+    socketio.emit("ia:event", data)  # ✅ envoi global à tous les clients connectés
+    return {"status": "ok"}
 
-# === 🔬 ROUTE DE TEST MANUEL (pour vérifier Render → InterArcade) ===
+
+# === 🔬 ROUTE DE TEST MANUEL (Render → InterArcade) ===
 @app.route("/test_emit")
 def test_emit():
     """Permet de tester l'envoi manuel d'un événement vers InterArcade"""
@@ -55,8 +66,9 @@ def test_emit():
         "count": 1
     }
     print(f"🧪 Test manuel envoyé : {data}")
-    socketio.emit("ia:event", data)  # ✅ suppression de broadcast=True
+    socketio.emit("ia:event", data)
     return jsonify({"status": "ok", "sent": data})
+
 
 # === LANCEMENT SERVEUR ===
 if __name__ == "__main__":
