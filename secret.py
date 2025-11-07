@@ -17,15 +17,16 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 # 1️⃣ Par clé unique : "IA-TEST-BASIC"
 # 2️⃣ Ou par tuple (username, key)
 # Chaque utilisateur a sa liste de jeux autorisés (games)
+
 LICENSES = {
     # 🔹 Exemple : licence générique "basic"
     "IA-TEST-BASIC": {"games": ["slot"]},
 
-    # 🔹 Exemple : licence PRO globale
+    # 🔹 Exemple : licence PRO globale (accès à tous les jeux)
     "IA-TEST-PRO": {"games": ["slot", "duel", "race", "plinko"]},
 
-    # 🔹 Exemple : licence utilisateur spécifique
-    ("songmicon", "IA-SONGMI-PRO"): {"games": ["slot", "plinko", "race"]},
+    # 🔹 Licence spécifique pour ton compte principal
+    ("songmicon", "IA-SONGMI-PRO"): {"games": ["slot", "plinko", "race", "duel"]},
 
     # 🔹 Exemple : un utilisateur qui n’a qu’un jeu débloqué
     ("creatorX", "IA-CRX-SLOT"): {"games": ["slot"]},
@@ -34,6 +35,10 @@ LICENSES = {
     ("creatorY", "IA-CRY-DUEL"): {"games": ["duel", "plinko"]},
 }
 
+
+# ============================================================
+# 🌐 ROUTES HTTP
+# ============================================================
 
 @app.route("/health")
 def health():
@@ -70,14 +75,18 @@ def verify_key():
         })
 
     # ❌ Clé inconnue
+    print(f"⛔ Licence refusée : {username} / {key}")
     return jsonify({"status": "unauthorized"}), 200
 
 
-# === RELAIS D'ÉVÉNEMENTS TIKTOK ===
+# ============================================================
+# 🎥 RELAIS D'ÉVÉNEMENTS TIKTOK
+# ============================================================
+
 @socketio.on("tiktok_event")
 def handle_tiktok_event(data):
     print(f"📡 Événement TikTokLive reçu : {data}")
-    socketio.emit("ia:event", data)  # ✅ relai global sans broadcast
+    socketio.emit("ia:event", data)  # ✅ Relai global sans broadcast
 
 
 @app.route("/test_emit")
@@ -89,6 +98,9 @@ def test_emit():
     return jsonify({"status": "ok", "sent": data})
 
 
+# ============================================================
+# 🚀 Lancement du serveur
+# ============================================================
 if __name__ == "__main__":
     print("🚀 Serveur InterArcade Cloud prêt sur http://0.0.0.0:5000")
     socketio.run(app, host="0.0.0.0", port=5000)
