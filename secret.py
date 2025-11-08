@@ -1,5 +1,5 @@
 # ============================================================
-# ✅ secret.py — InterArcade Cloud (version modulaire par jeu + gestion externe)
+# ✅ secret.py — InterArcade Cloud (licences dynamiques corrigées)
 # ============================================================
 import eventlet, json, os
 eventlet.monkey_patch()
@@ -13,13 +13,12 @@ CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 # ============================================================
-# 🔑 CHARGEMENT DES LICENCES DEPUIS FICHIER EXTERNE
+# 🔑 CHARGEMENT DES LICENCES
 # ============================================================
-
 LICENSES_FILE = "licenses.json"
 
 def load_licenses():
-    """Charge les licences depuis licenses.json s'il existe, sinon fallback sur LICENSES interne."""
+    """Charge les licences depuis licenses.json s'il existe"""
     if os.path.exists(LICENSES_FILE):
         try:
             with open(LICENSES_FILE, "r", encoding="utf-8") as f:
@@ -28,27 +27,23 @@ def load_licenses():
             print(f"⚠️ Erreur lecture {LICENSES_FILE}: {e}")
     return {}
 
-# === LICENCES PAR DÉFAUT (fallback)
+# Licences de secours si le fichier n’est pas trouvé
 DEFAULT_LICENSES = {
     "IA-TEST-BASIC": {"games": ["slot"]},
     "IA-TEST-PRO": {"games": ["slot", "duel", "race", "plinko"]},
     ("songmicon", "IA-SONGMI-PRO"): {"games": ["slot", "plinko", "race", "duel"]},
-    ("creatorX", "IA-CRX-SLOT"): {"games": ["slot"]},
-    ("creatorY", "IA-CRY-DUEL"): {"games": ["duel", "plinko"]},
 }
 
 # ============================================================
-# 🌐 ROUTES HTTP
+# 🌐 ROUTES
 # ============================================================
-
 @app.route("/health")
 def health():
-    """Test de santé du serveur"""
     return jsonify({"status": "ok"})
 
 @app.route("/verify_key", methods=["POST", "GET"])
 def verify_key():
-    """Vérifie si la clé et le pseudo sont autorisés"""
+    """Vérifie si la clé et le pseudo sont autorisés (compatibilité double format)"""
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or request.args.get("username") or "").strip()
     key = (data.get("key") or request.args.get("key") or "").strip()
@@ -58,22 +53,28 @@ def verify_key():
 
     licenses = load_licenses() or DEFAULT_LICENSES
 
-    # 🔎 Vérifie correspondance exacte
+    # ✅ 1. Format (username, key)
     if (username, key) in licenses:
-        user_data = licenses[(username, key)]
         return jsonify({
             "status": "authorized",
             "username": username,
-            "games": user_data.get("games", []),
+            "games": licenses[(username, key)].get("games", [])
         })
 
-    # 🔎 Ou bien clé générique
+    # ✅ 2. Format simple "IA-KEY"
     if key in licenses:
-        user_data = licenses[key]
         return jsonify({
             "status": "authorized",
             "username": username,
-            "games": user_data.get("games", []),
+            "games": licenses[key].get("games", [])
+        })
+
+    # ✅ 3. Format JSON : "username": {"key": "...", "games": [...]}
+    if username in licenses and licenses[username].get("key") == key:
+        return jsonify({
+            "status": "authorized",
+            "username": username,
+            "games": licenses[username].get("games", [])
         })
 
     print(f"⛔ Licence refusée : {username} / {key}")
@@ -85,11 +86,10 @@ def verify_key():
 @socketio.on("tiktok_event")
 def handle_tiktok_event(data):
     print(f"📡 Événement TikTokLive reçu : {data}")
-    socketio.emit("ia:event", data)  # ✅ Relai global
+    socketio.emit("ia:event", data)
 
 @app.route("/test_emit")
 def test_emit():
-    """Test manuel pour Render → InterArcade"""
     data = {"type": "gift", "username": "test_user", "gift": "Rose", "count": 1}
     print(f"🧪 Test manuel envoyé : {data}")
     socketio.emit("ia:event", data)
