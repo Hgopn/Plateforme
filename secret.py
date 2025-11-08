@@ -1,7 +1,7 @@
 # ============================================================
-# ✅ secret.py — InterArcade Cloud (version modulaire par jeu)
+# ✅ secret.py — InterArcade Cloud (version modulaire par jeu + gestion externe)
 # ============================================================
-import eventlet
+import eventlet, json, os
 eventlet.monkey_patch()
 
 from flask import Flask, request, jsonify
@@ -12,29 +12,30 @@ app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
-# === LICENCES UTILISATEURS ===
-# Chaque entrée peut être :
-# 1️⃣ Par clé unique : "IA-TEST-BASIC"
-# 2️⃣ Ou par tuple (username, key)
-# Chaque utilisateur a sa liste de jeux autorisés (games)
+# ============================================================
+# 🔑 CHARGEMENT DES LICENCES DEPUIS FICHIER EXTERNE
+# ============================================================
 
-LICENSES = {
-    # 🔹 Exemple : licence générique "basic"
+LICENSES_FILE = "licenses.json"
+
+def load_licenses():
+    """Charge les licences depuis licenses.json s'il existe, sinon fallback sur LICENSES interne."""
+    if os.path.exists(LICENSES_FILE):
+        try:
+            with open(LICENSES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"⚠️ Erreur lecture {LICENSES_FILE}: {e}")
+    return {}
+
+# === LICENCES PAR DÉFAUT (fallback)
+DEFAULT_LICENSES = {
     "IA-TEST-BASIC": {"games": ["slot"]},
-
-    # 🔹 Exemple : licence PRO globale (accès à tous les jeux)
     "IA-TEST-PRO": {"games": ["slot", "duel", "race", "plinko"]},
-
-    # 🔹 Licence spécifique pour ton compte principal
     ("songmicon", "IA-SONGMI-PRO"): {"games": ["slot", "plinko", "race", "duel"]},
-
-    # 🔹 Exemple : un utilisateur qui n’a qu’un jeu débloqué
     ("creatorX", "IA-CRX-SLOT"): {"games": ["slot"]},
-
-    # 🔹 Exemple : un autre utilisateur avec 2 jeux
     ("creatorY", "IA-CRY-DUEL"): {"games": ["duel", "plinko"]},
 }
-
 
 # ============================================================
 # 🌐 ROUTES HTTP
@@ -44,7 +45,6 @@ LICENSES = {
 def health():
     """Test de santé du serveur"""
     return jsonify({"status": "ok"})
-
 
 @app.route("/verify_key", methods=["POST", "GET"])
 def verify_key():
@@ -56,38 +56,36 @@ def verify_key():
     if not username or not key:
         return jsonify({"status": "unauthorized", "reason": "missing"}), 400
 
-    # 🔎 Vérifie d’abord la correspondance (username, key)
-    if (username, key) in LICENSES:
-        user_data = LICENSES[(username, key)]
+    licenses = load_licenses() or DEFAULT_LICENSES
+
+    # 🔎 Vérifie correspondance exacte
+    if (username, key) in licenses:
+        user_data = licenses[(username, key)]
         return jsonify({
             "status": "authorized",
             "username": username,
             "games": user_data.get("games", []),
         })
 
-    # 🔎 Sinon, tente une clé générique
-    if key in LICENSES:
-        user_data = LICENSES[key]
+    # 🔎 Ou bien clé générique
+    if key in licenses:
+        user_data = licenses[key]
         return jsonify({
             "status": "authorized",
             "username": username,
             "games": user_data.get("games", []),
         })
 
-    # ❌ Clé inconnue
     print(f"⛔ Licence refusée : {username} / {key}")
     return jsonify({"status": "unauthorized"}), 200
-
 
 # ============================================================
 # 🎥 RELAIS D'ÉVÉNEMENTS TIKTOK
 # ============================================================
-
 @socketio.on("tiktok_event")
 def handle_tiktok_event(data):
     print(f"📡 Événement TikTokLive reçu : {data}")
-    socketio.emit("ia:event", data)  # ✅ Relai global sans broadcast
-
+    socketio.emit("ia:event", data)  # ✅ Relai global
 
 @app.route("/test_emit")
 def test_emit():
@@ -96,7 +94,6 @@ def test_emit():
     print(f"🧪 Test manuel envoyé : {data}")
     socketio.emit("ia:event", data)
     return jsonify({"status": "ok", "sent": data})
-
 
 # ============================================================
 # 🚀 Lancement du serveur

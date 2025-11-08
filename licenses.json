@@ -1,0 +1,20 @@
+{
+  "IA-TEST-BASIC": {
+    "games": ["slot"]
+  },
+  "IA-TEST-PRO": {
+    "games": ["slot", "duel", "race", "plinko"]
+  },
+  "songmicon": {
+    "key": "IA-SONGMI-PRO",
+    "games": ["slot", "duel", "plinko", "race"]
+  },
+  "creatorX": {
+    "key": "IA-CRX-SLOT",
+    "games": ["slot"]
+  },
+  "creatorY": {
+    "key": "IA-CRY-DUEL",
+    "games": ["duel", "plinko"]
+  }
+}
