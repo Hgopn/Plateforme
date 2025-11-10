@@ -1,10 +1,10 @@
 # ============================================================
-# ✅ secret.py — InterArcade Cloud (licences dynamiques corrigées + manifest Render)
+# ✅ secret.py — InterArcade Cloud (licences dynamiques + manifest Render + serve static)
 # ============================================================
 import eventlet, json, os
 eventlet.monkey_patch()
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO
 from flask_cors import CORS
 
@@ -39,15 +39,15 @@ DEFAULT_LICENSES = {
 # ============================================================
 GAMES_MANIFEST = {
     "games": [
-        "slot",      # ✅ Jeu actuel
-        # "plinko",  # à activer plus tard
-        # "duel",
-        # "race",
+        {"name": "slot", "title": "Machine Slot", "description": "Chaque cadeau déclenche un spin 🎰"},
+        # {"name": "plinko", "title": "Jeu du Fakir", "description": "Fais tomber la bille 🎯"},
+        # {"name": "duel", "title": "Duel des 100 dés", "description": "Combat de chance et de dés 🎲"},
+        # {"name": "race", "title": "Course de billes", "description": "La bille la plus rapide gagne 🏁"},
     ]
 }
 
 # ============================================================
-# 🌐 ROUTES
+# 🌐 ROUTES API
 # ============================================================
 @app.route("/health")
 def health():
@@ -93,12 +93,27 @@ def verify_key():
     return jsonify({"status": "unauthorized"}), 200
 
 
-# ✅ NOUVELLE ROUTE : manifest des jeux pour le launcher InterArcade
+# ✅ Route manifest JSON pour l'application InterArcade
 @app.route("/games/manifest.json", methods=["GET"])
 def games_manifest():
     """Manifest simple utilisé par l'application InterArcade"""
     return jsonify(GAMES_MANIFEST)
 
+
+# ============================================================
+# 🕹️ SERVEURS DES JEUX (HTML/CSS/JS)
+# ============================================================
+@app.route("/games/<path:filename>")
+def serve_game_file(filename):
+    """Permet à Render de servir les fichiers statiques des jeux"""
+    games_dir = os.path.join(os.getcwd(), "games")
+    file_path = os.path.join(games_dir, filename)
+
+    if not os.path.exists(file_path):
+        print(f"❌ Fichier introuvable : {file_path}")
+        return jsonify({"error": "Fichier introuvable", "path": filename}), 404
+
+    return send_from_directory(games_dir, filename)
 
 # ============================================================
 # 🎥 RELAIS D'ÉVÉNEMENTS TIKTOK
