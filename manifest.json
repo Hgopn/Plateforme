@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "games": [
+    {
+      "name": "slot",
+      "version": "1.0.0",
+      "file": "slot_v1.zip",
+      "url": "https://plateforme-v2.onrender.com/games/slot_v1.zip"
+    }
+  ]
+}
