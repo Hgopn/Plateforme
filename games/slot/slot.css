@@ -1,0 +1,61 @@
+body {
+  margin: 0;
+  background: radial-gradient(circle at center, #0d0d1a, #000);
+  color: white;
+  font-family: 'Rajdhani', sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+.slot-container {
+  text-align: center;
+}
+
+.reel {
+  display: inline-block;
+  font-size: 4rem;
+  margin: 0 10px;
+}
+
+.btn {
+  background: #00d4ff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #000;
+  margin-top: 20px;
+  font-weight: bold;
+}
+
+/* ======================================================
+   🧩 Bannière du joueur en cours de spin
+   ====================================================== */
+#current-player {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 255, 200, 0.15);
+  color: #00ffe7;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.4rem;
+  letter-spacing: 1px;
+  padding: 10px 22px;
+  border: 2px solid rgba(0, 255, 200, 0.5);
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+  opacity: 0;
+  transition: opacity 0.4s ease, transform 0.3s ease;
+  z-index: 999;
+}
+
+/* 🎬 Effet d’apparition fluide (petit rebond néon) */
+#current-player.show {
+  opacity: 1;
+  transform: translateX(-50%) scale(1.05);
+}
