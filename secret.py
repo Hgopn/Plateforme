@@ -1,5 +1,5 @@
 # ============================================================
-# ✅ secret.py — InterArcade Cloud (licences dynamiques corrigées)
+# ✅ secret.py — InterArcade Cloud (licences dynamiques corrigées + manifest Render)
 # ============================================================
 import eventlet, json, os
 eventlet.monkey_patch()
@@ -32,6 +32,18 @@ DEFAULT_LICENSES = {
     "IA-TEST-BASIC": {"games": ["slot"]},
     "IA-TEST-PRO": {"games": ["slot", "duel", "race", "plinko"]},
     ("songmicon", "IA-SONGMI-PRO"): {"games": ["slot", "plinko", "race", "duel"]},
+}
+
+# ============================================================
+# 🔹 MANIFEST JEUX (servi à l'application InterArcade)
+# ============================================================
+GAMES_MANIFEST = {
+    "games": [
+        "slot",      # ✅ Jeu actuel
+        # "plinko",  # à activer plus tard
+        # "duel",
+        # "race",
+    ]
 }
 
 # ============================================================
@@ -79,6 +91,14 @@ def verify_key():
 
     print(f"⛔ Licence refusée : {username} / {key}")
     return jsonify({"status": "unauthorized"}), 200
+
+
+# ✅ NOUVELLE ROUTE : manifest des jeux pour le launcher InterArcade
+@app.route("/games/manifest.json", methods=["GET"])
+def games_manifest():
+    """Manifest simple utilisé par l'application InterArcade"""
+    return jsonify(GAMES_MANIFEST)
+
 
 # ============================================================
 # 🎥 RELAIS D'ÉVÉNEMENTS TIKTOK
