@@ -37,13 +37,10 @@ DEFAULT_LICENSES = {
 # ============================================================
 # 🔹 MANIFEST JEUX (servi à l'application InterArcade)
 # ============================================================
+# ✅ On simplifie le format pour correspondre à ce qu'attend renderer.js
 GAMES_MANIFEST = {
-    "games": [
-        {"name": "slot", "title": "Machine Slot", "description": "Chaque cadeau déclenche un spin 🎰"},
-        # {"name": "plinko", "title": "Jeu du Fakir", "description": "Fais tomber la bille 🎯"},
-        # {"name": "duel", "title": "Duel des 100 dés", "description": "Combat de chance et de dés 🎲"},
-        # {"name": "race", "title": "Course de billes", "description": "La bille la plus rapide gagne 🏁"},
-    ]
+    "games": ["slot"]
+    # "plinko", "duel", "race" à réactiver plus tard
 }
 
 # ============================================================
