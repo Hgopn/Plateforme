@@ -1,11 +1,11 @@
 # ============================================================
-# ✅ secret.py — InterArcade Cloud (multi-utilisateurs TikTok + manifest + licences + serve static)
+# ✅ secret.py — InterArcade Cloud (multi-utilisateurs TikTok + manifest + licences + serve static + rooms)
 # ============================================================
 import eventlet, json, os, threading, asyncio
 eventlet.monkey_patch()
 
 from flask import Flask, request, jsonify, send_from_directory
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, join_room, leave_room
 from flask_cors import CORS
 
 # ============================================================
@@ -85,18 +85,54 @@ def serve_game_file(filename):
     return send_from_directory(games_dir, filename)
 
 # ============================================================
-# 🎥 RELAIS D'ÉVÉNEMENTS TIKTOK
+# 🔐 ROOMS PAR PSEUDO — connexion des clients
+# ============================================================
+@socketio.on("connect")
+def on_connect():
+    username = (request.args.get("username") or "").strip()
+    if username:
+        join_room(username)
+        print(f"🔌 Client {request.sid} rejoint la room @{username}")
+    else:
+        print(f"🔌 Client {request.sid} connecté (sans username)")
+
+@socketio.on("disconnect")
+def on_disconnect():
+    username = (request.args.get("username") or "").strip()
+    if username:
+        leave_room(username)
+        print(f"🔌 Client {request.sid} quitte la room @{username}")
+    else:
+        print(f"🔌 Client {request.sid} déconnecté")
+
+# ============================================================
+# 🎥 RELAIS D'ÉVÉNEMENTS TIKTOK (ciblage par room)
 # ============================================================
 @socketio.on("tiktok_event")
 def handle_tiktok_event(data):
-    print(f"📡 Événement TikTokLive reçu : {data}")
-    socketio.emit("ia:event", data)
+    """
+    data doit contenir la clé 'target' = pseudo du streamer (room).
+    On ne diffuse que dans la room du streamer.
+    """
+    target = (data or {}).get("target")
+    if target:
+        socketio.emit("ia:event", data, to=target)
+        print(f"📡 Relay vers room @{target} : {data}")
+    else:
+        # Fallback: broadcast (éviter si possible)
+        socketio.emit("ia:event", data)
+        print(f"📡 Relay en broadcast (sans target) : {data}")
 
 @app.route("/test_emit")
 def test_emit():
-    data = {"type": "gift", "username": "test_user", "gift": "Rose", "count": 1}
+    # test vers une room spécifique si ?target=pseudo
+    target = (request.args.get("target") or "").strip()
+    data = {"type": "gift", "username": "test_user", "from": "test_user", "gift": "Rose", "count": 1, "target": target or None}
     print(f"🧪 Test manuel envoyé : {data}")
-    socketio.emit("ia:event", data)
+    if target:
+        socketio.emit("ia:event", data, to=target)
+    else:
+        socketio.emit("ia:event", data)
     return jsonify({"status": "ok", "sent": data})
 
 # ============================================================
@@ -122,7 +158,8 @@ def start_listener_for(username: str):
     async def connect_socket():
         while True:
             try:
-                sio.connect(BACKEND_URL, transports=["websocket"])
+                # le listener se connecte aussi avec ?username=<streamer>
+                sio.connect(BACKEND_URL, transports=["websocket"], headers={}, socketio_path="/socket.io", wait=True)
                 print(f"🟢 Listener @{username} connecté à Render")
                 break
             except Exception as e:
@@ -133,6 +170,7 @@ def start_listener_for(username: str):
 
     @client.on(GiftEvent)
     async def on_gift(event: GiftEvent):
+        # n'émet qu'à la fin du streak
         if not event.repeat_end:
             return
         data = {
@@ -141,6 +179,8 @@ def start_listener_for(username: str):
             "from": event.user.unique_id,
             "gift": event.gift.name,
             "count": event.repeat_count,
+            # 🔑 cible la room du streamer
+            "target": username,
         }
         print(f"🎁 Cadeau @{username}: {data}")
         try:
@@ -150,7 +190,7 @@ def start_listener_for(username: str):
 
     @client.on(LikeEvent)
     async def on_like(event: LikeEvent):
-        data = {"type": "like", "username": event.user.unique_id, "count": event.like_count}
+        data = {"type": "like", "username": event.user.unique_id, "count": event.like_count, "target": username}
         sio.emit("tiktok_event", data)
         print(f"❤️ Like @{username}: {data}")
 
@@ -175,14 +215,13 @@ def start_listener_for(username: str):
     print(f"✅ Listener TikTok lancé pour @{username}")
 
 # ============================================================
-# 🌐 ROUTE API : DEMARRER UN LISTENER POUR UN USER
+# 🌐 ROUTE API : DÉMARRER UN LISTENER POUR UN USER
 # ============================================================
 @app.route("/start_listener", methods=["POST"])
 def start_listener_api():
     """Démarre un listener TikTok pour le pseudo reçu"""
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
-
     if not username:
         return jsonify({"status": "error", "reason": "missing_username"}), 400
 
@@ -190,10 +229,9 @@ def start_listener_api():
     return jsonify({"status": "ok", "message": f"Listener TikTok lancé pour {username}"}), 200
 
 # ============================================================
-# 🚀 Lancement du serveur (Render ready)
+# 🚀 Lancement du serveur
 # ============================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"🚀 Serveur InterArcade Cloud prêt sur http://0.0.0.0:{port}")
-
     socketio.run(app, host="0.0.0.0", port=port)
