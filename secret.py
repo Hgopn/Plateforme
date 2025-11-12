@@ -190,14 +190,10 @@ def start_listener_api():
     return jsonify({"status": "ok", "message": f"Listener TikTok lancé pour {username}"}), 200
 
 # ============================================================
-# 🚀 Lancement du serveur + listener
+# 🚀 Lancement du serveur (Render ready)
 # ============================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"🚀 Serveur InterArcade Cloud prêt sur http://0.0.0.0:{port}")
 
-    # 🧩 Lancement du listener TikTok en arrière-plan
-    threading.Thread(target=start_tiktok_listener, daemon=True).start()
-
-    # 🧠 Important : Render définit automatiquement PORT, pas besoin de 5000 fixe
     socketio.run(app, host="0.0.0.0", port=port)
