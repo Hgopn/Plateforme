@@ -17,7 +17,7 @@
     "key": "IA-CRY-DUEL",
     "games": ["duel", "plinko"]
   },
-  "jks.game": {
+  "jks_game": {
     "key": "IA-SONGMI-PRO",
     "games": ["slot", "duel", "plinko", "race"]
   }
