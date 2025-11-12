@@ -28,3 +28,4 @@ flask
 flask-socketio
 flask-cors
 eventlet
+websocket-client
