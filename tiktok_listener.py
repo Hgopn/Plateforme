@@ -1,4 +1,6 @@
-# tiktok_listener.py — version stable finale (TikTok → Render → InterArcade)
+# ============================================================
+# ✅ tiktok_listener.py — version stable finale (TikTok → Render → InterArcade)
+# ============================================================
 
 import asyncio
 import socketio
@@ -17,7 +19,13 @@ async def connect_socket():
     connected = False
     while not connected:
         try:
-            sio.connect(BACKEND_URL, transports=["websocket"])
+            print("✅ Tentative de connexion à Socket.IO Render...")
+            sio.connect(
+                BACKEND_URL,
+                socketio_path="/socket.io/",
+                transports=["websocket"],
+                wait_timeout=10
+            )
             print(f"🟢 Connecté à Render ({BACKEND_URL}) via Socket.IO")
             connected = True
         except Exception as e:
@@ -41,7 +49,7 @@ async def on_gift(event: GiftEvent):
     data = {
         "type": "gift",
         "username": event.user.unique_id,
-        "from": event.user.unique_id,  # ✅ clé ajoutée pour slot.js
+        "from": event.user.unique_id,  # ✅ clé ajoutée pour compatibilité slot.js
         "gift": event.gift.name,
         "count": event.repeat_count,
         "streaking": event.repeat_end
@@ -49,6 +57,7 @@ async def on_gift(event: GiftEvent):
     print(f"🎁 Cadeau reçu: {data}")
     try:
         sio.emit("tiktok_event", data)
+        print("📡 Événement envoyé à Render via Socket.IO")
     except Exception as e:
         print(f"⚠️ Erreur lors de l’émission Socket.IO: {e}")
 
@@ -57,20 +66,28 @@ async def on_like(event: LikeEvent):
     data = {
         "type": "like",
         "username": event.user.unique_id,
+        "from": event.user.unique_id,
         "count": event.like_count
     }
     print(f"❤️ Like reçu: {data}")
-    sio.emit("tiktok_event", data)
+    try:
+        sio.emit("tiktok_event", data)
+    except Exception as e:
+        print(f"⚠️ Erreur envoi Like: {e}")
 
 @client.on(CommentEvent)
 async def on_comment(event: CommentEvent):
     data = {
         "type": "comment",
         "username": event.user.unique_id,
+        "from": event.user.unique_id,
         "comment": event.comment
     }
     print(f"💬 Commentaire reçu: {data}")
-    sio.emit("tiktok_event", data)
+    try:
+        sio.emit("tiktok_event", data)
+    except Exception as e:
+        print(f"⚠️ Erreur envoi Comment: {e}")
 
 # === BOUCLE PRINCIPALE ===
 async def run_client():
