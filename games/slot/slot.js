@@ -6,28 +6,6 @@
 let spinning = false;
 const spinQueue = [];
 
-// === 🔗 Connexion Socket.IO à Render ===
-let socket = null;
-try {
-  socket = io("https://plateforme-v2.onrender.com", { transports: ["websocket"] });
-
-  socket.on("connect", () => {
-    console.log("🟢 Connecté à Render via Socket.IO");
-  });
-
-  socket.on("disconnect", () => {
-    console.warn("🔴 Déconnecté de Render");
-  });
-
-  // 🎁 Événements TikTok Live reçus depuis Render
-  socket.on("ia:event", (data) => {
-    console.log("🎁 Événement TikTok reçu depuis Render :", data);
-    enqueueSpin(data);
-  });
-} catch (err) {
-  console.error("❌ Erreur connexion Socket.IO :", err);
-}
-
 // === INITIALISATION ===
 document.addEventListener("DOMContentLoaded", () => {
   const playerEl = document.getElementById("player");
@@ -36,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const reels = document.querySelectorAll(".reel");
   const currentPlayerEl = document.getElementById("current-player");
 
-  // --- Compatibilité : si Electron existe, on le garde, sinon window ---
+  // --- Compatibilité Electron ---
   let ipcRenderer = null;
   try {
     if (window.require) {
@@ -46,49 +24,6 @@ document.addEventListener("DOMContentLoaded", () => {
   } catch {
     console.warn("⚠️ ipcRenderer non disponible (mode Render).");
   }
-
-  // 🎮 Bouton manuel (test local)
-  spinBtn.addEventListener("click", () => {
-    enqueueSpin({ from: "Test", gift: "Manuel", count: 1 });
-  });
-
-  // 🧩 Si ipcRenderer est dispo → écoute Electron
-  if (ipcRenderer) {
-    ipcRenderer
-      .invoke("get-player")
-      .then((player) => {
-        if (playerEl)
-          playerEl.textContent = `Bienvenue ${player || "Joueur anonyme"} !`;
-      })
-      .catch((err) => console.error("Erreur get-player :", err));
-
-    ipcRenderer.on("slot:spin", (_evt, payload) => {
-      console.log("🎯 Événement cadeau reçu (Electron) :", payload);
-      enqueueSpin(payload);
-    });
-
-    ipcRenderer.on("slot:player", (_evt, playerName) => {
-      if (!currentPlayerEl) return;
-      currentPlayerEl.textContent = `🎰 ${playerName} is spinning...`;
-      currentPlayerEl.style.opacity = "1";
-      setTimeout(() => (currentPlayerEl.style.opacity = "0"), 3500);
-    });
-  }
-
-  // 🧠 Sinon → écoute via window.postMessage (fallback)
-  window.addEventListener("message", (event) => {
-    const data = event.data;
-    if (data?.type === "slot:spin") {
-      console.log("📩 Spin reçu via window.postMessage :", data);
-      enqueueSpin(data);
-    } else if (data?.type === "slot:player") {
-      if (currentPlayerEl) {
-        currentPlayerEl.textContent = `🎰 ${data.username} is spinning...`;
-        currentPlayerEl.style.opacity = "1";
-        setTimeout(() => (currentPlayerEl.style.opacity = "0"), 3500);
-      }
-    }
-  });
 
   // === FILE D’ATTENTE DE SPINS ===
   function enqueueSpin(payload) {
@@ -153,7 +88,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return new Promise((r) => setTimeout(r, ms));
   }
 
-  // === EFFETS SONORES ===
   function playSound(type) {
     const audio = document.createElement("audio");
     if (type === "spin-start") audio.src = "../assets/sound_spin.mp3";
@@ -162,5 +96,32 @@ document.addEventListener("DOMContentLoaded", () => {
     else audio.src = "../assets/sound_fail.mp3";
     audio.volume = 0.3;
     audio.play().catch(() => {});
+  }
+
+  // 🎮 Bouton manuel (test local)
+  spinBtn.addEventListener("click", () => {
+    enqueueSpin({ from: "Test", gift: "Manuel", count: 1 });
+  });
+
+  // === 🔗 Connexion Socket.IO à Render ===
+  let socket = null;
+  try {
+    socket = io("https://plateforme-v2.onrender.com", { transports: ["websocket"] });
+
+    socket.on("connect", () => {
+      console.log("🟢 Connecté à Render via Socket.IO");
+    });
+
+    socket.on("disconnect", () => {
+      console.warn("🔴 Déconnecté de Render");
+    });
+
+    // 🎁 Événements TikTok Live reçus depuis Render
+    socket.on("ia:event", (data) => {
+      console.log("🎁 Événement TikTok reçu depuis Render :", data);
+      enqueueSpin(data);
+    });
+  } catch (err) {
+    console.error("❌ Erreur connexion Socket.IO :", err);
   }
 });
