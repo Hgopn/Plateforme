@@ -41,6 +41,7 @@ async def on_gift(event: GiftEvent):
     data = {
         "type": "gift",
         "username": event.user.unique_id,
+        "from": event.user.unique_id,  # ✅ clé ajoutée pour slot.js
         "gift": event.gift.name,
         "count": event.repeat_count,
         "streaking": event.repeat_end
