@@ -21,7 +21,6 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 LICENSES_FILE = "licenses.json"
 
 def load_licenses():
-    """Charge les licences depuis licenses.json s'il existe"""
     if os.path.exists(LICENSES_FILE):
         try:
             with open(LICENSES_FILE, "r", encoding="utf-8") as f:
@@ -30,7 +29,6 @@ def load_licenses():
             print(f"⚠️ Erreur lecture {LICENSES_FILE}: {e}")
     return {}
 
-# Licences de secours
 DEFAULT_LICENSES = {
     "IA-TEST-BASIC": {"games": ["slot"]},
     "IA-TEST-PRO": {"games": ["slot", "duel", "race", "plinko"]},
@@ -38,11 +36,9 @@ DEFAULT_LICENSES = {
 }
 
 # ============================================================
-# 🔹 MANIFEST JEUX (servi à l'application InterArcade)
+# 🔹 MANIFEST JEUX
 # ============================================================
-GAMES_MANIFEST = {
-    "games": ["slot"]
-}
+GAMES_MANIFEST = {"games": ["slot"]}
 
 # ============================================================
 # 🌐 ROUTES API
@@ -53,7 +49,6 @@ def health():
 
 @app.route("/verify_key", methods=["POST", "GET"])
 def verify_key():
-    """Vérifie si la clé et le pseudo sont autorisés"""
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or request.args.get("username") or "").strip()
     key = (data.get("key") or request.args.get("key") or "").strip()
@@ -63,7 +58,6 @@ def verify_key():
 
     licenses = load_licenses() or DEFAULT_LICENSES
 
-    # Formats de clé acceptés
     if (username, key) in licenses:
         return jsonify({"status": "authorized", "username": username, "games": licenses[(username, key)].get("games", [])})
     if key in licenses:
@@ -74,24 +68,20 @@ def verify_key():
     print(f"⛔ Licence refusée : {username} / {key}")
     return jsonify({"status": "unauthorized"}), 200
 
-# ✅ Manifest pour InterArcade
-@app.route("/games/manifest.json", methods=["GET"])
+@app.route("/games/manifest.json")
 def games_manifest():
     return jsonify(GAMES_MANIFEST)
 
 # ============================================================
-# 🕹️ SERVEURS DES JEUX (HTML/CSS/JS)
+# 🕹️ SERVEURS DES JEUX
 # ============================================================
 @app.route("/games/<path:filename>")
 def serve_game_file(filename):
-    """Permet à Render de servir les fichiers statiques des jeux"""
     games_dir = os.path.join(os.getcwd(), "games")
     file_path = os.path.join(games_dir, filename)
-
     if not os.path.exists(file_path):
         print(f"❌ Fichier introuvable : {file_path}")
         return jsonify({"error": "Fichier introuvable", "path": filename}), 404
-
     return send_from_directory(games_dir, filename)
 
 # ============================================================
@@ -110,10 +100,9 @@ def test_emit():
     return jsonify({"status": "ok", "sent": data})
 
 # ============================================================
-# 🔁 TIKTOK LISTENER INTÉGRÉ (dans le même service Render)
+# 🔁 TIKTOK LISTENER INTÉGRÉ
 # ============================================================
 def start_tiktok_listener():
-    """Lance le client TikTok Live dans un thread parallèle"""
     import socketio as sio_client
     from TikTokLive import TikTokLiveClient
     from TikTokLive.events import GiftEvent, LikeEvent, CommentEvent, ConnectEvent, DisconnectEvent
@@ -136,17 +125,20 @@ def start_tiktok_listener():
 
     client = TikTokLiveClient(unique_id=USERNAME)
 
+    # ✅ Fix : on n'envoie le spin qu'à la fin du streak
     @client.on(GiftEvent)
     async def on_gift(event: GiftEvent):
+        if not event.repeat_end:
+            return  # Ignorer les signaux intermédiaires
+
         data = {
             "type": "gift",
             "username": event.user.unique_id,
             "from": event.user.unique_id,
             "gift": event.gift.name,
             "count": event.repeat_count,
-            "streaking": event.repeat_end,
         }
-        print(f"🎁 Listener: Cadeau reçu {data}")
+        print(f"🎁 Listener: Cadeau reçu (streak terminé) {data}")
         try:
             sio.emit("tiktok_event", data)
         except Exception as e:
@@ -180,8 +172,5 @@ def start_tiktok_listener():
 # ============================================================
 if __name__ == "__main__":
     print("🚀 Serveur InterArcade Cloud prêt sur http://0.0.0.0:5000")
-
-    # 🧩 Lancement du listener en arrière-plan
     threading.Thread(target=start_tiktok_listener, daemon=True).start()
-
     socketio.run(app, host="0.0.0.0", port=5000)
