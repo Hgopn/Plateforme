@@ -1,5 +1,5 @@
 # ============================================================
-# ✅ secret.py — InterArcade Cloud (licences dynamiques + manifest Render + serve static + listener TikTok intégré)
+# ✅ secret.py — InterArcade Cloud (multi-utilisateurs TikTok + manifest + licences + serve static)
 # ============================================================
 import eventlet, json, os, threading, asyncio
 eventlet.monkey_patch()
@@ -100,37 +100,41 @@ def test_emit():
     return jsonify({"status": "ok", "sent": data})
 
 # ============================================================
-# 🔁 TIKTOK LISTENER INTÉGRÉ
+# 🔁 MULTI-LISTENERS TIKTOK (un par utilisateur)
 # ============================================================
-def start_tiktok_listener():
+listeners = {}
+
+def start_listener_for(username: str):
+    """Lance un listener TikTok pour un pseudo donné"""
     import socketio as sio_client
     from TikTokLive import TikTokLiveClient
     from TikTokLive.events import GiftEvent, LikeEvent, CommentEvent, ConnectEvent, DisconnectEvent
     from TikTokLive.client.errors import UserOfflineError
 
-    USERNAME = "songmicon"
-    BACKEND_URL = "https://plateforme-v2.onrender.com"
+    if username in listeners:
+        print(f"⚠️ Listener déjà actif pour @{username}")
+        return
 
+    print(f"🚀 Démarrage du listener TikTok pour @{username}")
     sio = sio_client.Client()
+    BACKEND_URL = "https://plateforme-v2.onrender.com"
 
     async def connect_socket():
         while True:
             try:
                 sio.connect(BACKEND_URL, transports=["websocket"])
-                print(f"🟢 Listener connecté à Render ({BACKEND_URL})")
+                print(f"🟢 Listener @{username} connecté à Render")
                 break
             except Exception as e:
-                print(f"❌ Tentative reconnexion Socket.IO: {e}")
+                print(f"❌ Reconnexion Socket.IO @{username}: {e}")
                 await asyncio.sleep(5)
 
-    client = TikTokLiveClient(unique_id=USERNAME)
+    client = TikTokLiveClient(unique_id=username)
 
-    # ✅ Fix : on n'envoie le spin qu'à la fin du streak
     @client.on(GiftEvent)
     async def on_gift(event: GiftEvent):
         if not event.repeat_end:
-            return  # Ignorer les signaux intermédiaires
-
+            return
         data = {
             "type": "gift",
             "username": event.user.unique_id,
@@ -138,39 +142,56 @@ def start_tiktok_listener():
             "gift": event.gift.name,
             "count": event.repeat_count,
         }
-        print(f"🎁 Listener: Cadeau reçu (streak terminé) {data}")
+        print(f"🎁 Cadeau @{username}: {data}")
         try:
             sio.emit("tiktok_event", data)
         except Exception as e:
-            print(f"⚠️ Erreur d’émission: {e}")
+            print(f"⚠️ Erreur émission @{username}: {e}")
 
     @client.on(LikeEvent)
     async def on_like(event: LikeEvent):
         data = {"type": "like", "username": event.user.unique_id, "count": event.like_count}
         sio.emit("tiktok_event", data)
-        print(f"❤️ Like reçu: {data}")
+        print(f"❤️ Like @{username}: {data}")
 
     async def run_listener():
         await connect_socket()
         while True:
             try:
-                print(f"🚀 Connexion au live TikTok @{USERNAME}")
+                print(f"📡 Connexion au live TikTok @{username}")
                 await client.connect()
                 while getattr(client, "connected", True):
                     await asyncio.sleep(2)
             except UserOfflineError:
-                print("⚠️ Le live TikTok n’est pas en ligne, nouvelle tentative...")
+                print(f"⚠️ @{username} offline, reconnexion dans 10s...")
                 await asyncio.sleep(10)
             except Exception as e:
-                print(f"❌ Erreur TikTokListener: {e}")
+                print(f"❌ Erreur TikTok @{username}: {e}")
                 await asyncio.sleep(5)
 
-    asyncio.run(run_listener())
+    thread = threading.Thread(target=lambda: asyncio.run(run_listener()), daemon=True)
+    thread.start()
+    listeners[username] = thread
+    print(f"✅ Listener TikTok lancé pour @{username}")
 
 # ============================================================
-# 🚀 Lancement du serveur + listener
+# 🌐 ROUTE API : DEMARRER UN LISTENER POUR UN USER
+# ============================================================
+@app.route("/start_listener", methods=["POST"])
+def start_listener_api():
+    """Démarre un listener TikTok pour le pseudo reçu"""
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+
+    if not username:
+        return jsonify({"status": "error", "reason": "missing_username"}), 400
+
+    threading.Thread(target=start_listener_for, args=(username,), daemon=True).start()
+    return jsonify({"status": "ok", "message": f"Listener TikTok lancé pour {username}"}), 200
+
+# ============================================================
+# 🚀 Lancement du serveur
 # ============================================================
 if __name__ == "__main__":
-    print("🚀 Serveur InterArcade Cloud prêt sur http://0.0.0.0:5000")
-    threading.Thread(target=start_tiktok_listener, daemon=True).start()
+    print("🚀 Serveur InterArcade Cloud (multi-listeners) prêt sur http://0.0.0.0:5000")
     socketio.run(app, host="0.0.0.0", port=5000)
