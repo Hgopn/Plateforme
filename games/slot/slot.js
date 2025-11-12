@@ -1,10 +1,32 @@
 // ======================================================
-// slot.js — Mini-jeu Machine à sous InterArcade (version stable TikTok Live / Render compatible)
+// slot.js — Machine à sous InterArcade (Render + TikTok Live compatible)
 // ======================================================
 
 // --- Variables globales ---
 let spinning = false;
 const spinQueue = [];
+
+// === 🔗 Connexion Socket.IO à Render ===
+let socket = null;
+try {
+  socket = io("https://plateforme-v2.onrender.com", { transports: ["websocket"] });
+
+  socket.on("connect", () => {
+    console.log("🟢 Connecté à Render via Socket.IO");
+  });
+
+  socket.on("disconnect", () => {
+    console.warn("🔴 Déconnecté de Render");
+  });
+
+  // 🎁 Événements TikTok Live reçus depuis Render
+  socket.on("ia:event", (data) => {
+    console.log("🎁 Événement TikTok reçu depuis Render :", data);
+    enqueueSpin(data);
+  });
+} catch (err) {
+  console.error("❌ Erreur connexion Socket.IO :", err);
+}
 
 // === INITIALISATION ===
 document.addEventListener("DOMContentLoaded", () => {
@@ -12,9 +34,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const resultEl = document.getElementById("result");
   const spinBtn = document.getElementById("spin-btn");
   const reels = document.querySelectorAll(".reel");
-  const currentPlayerEl = document.getElementById("current-player"); // ✅ nouvel élément
+  const currentPlayerEl = document.getElementById("current-player");
 
-  // --- Compatibilité : si Electron existe, on le garde, sinon on passe par window ---
+  // --- Compatibilité : si Electron existe, on le garde, sinon window ---
   let ipcRenderer = null;
   try {
     if (window.require) {
@@ -22,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ipcRenderer = electron.ipcRenderer;
     }
   } catch {
-    console.warn("⚠️ ipcRenderer non disponible, passage en mode postMessage.");
+    console.warn("⚠️ ipcRenderer non disponible (mode Render).");
   }
 
   // 🎮 Bouton manuel (test local)
@@ -30,7 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
     enqueueSpin({ from: "Test", gift: "Manuel", count: 1 });
   });
 
-  // 🧩 Si ipcRenderer est dispo → écoute des événements Electron
+  // 🧩 Si ipcRenderer est dispo → écoute Electron
   if (ipcRenderer) {
     ipcRenderer
       .invoke("get-player")
@@ -53,7 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 🧠 Sinon → on écoute les messages via window.postMessage
+  // 🧠 Sinon → écoute via window.postMessage (fallback)
   window.addEventListener("message", (event) => {
     const data = event.data;
     if (data?.type === "slot:spin") {
