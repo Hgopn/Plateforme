@@ -1,13 +1,16 @@
 # ============================================================
-# ✅ secret.py — InterArcade Cloud (licences dynamiques + manifest Render + serve static)
+# ✅ secret.py — InterArcade Cloud (licences dynamiques + manifest Render + serve static + listener TikTok intégré)
 # ============================================================
-import eventlet, json, os
+import eventlet, json, os, threading, asyncio
 eventlet.monkey_patch()
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO
 from flask_cors import CORS
 
+# ============================================================
+# 🌍 Flask + Socket.IO
+# ============================================================
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
@@ -27,7 +30,7 @@ def load_licenses():
             print(f"⚠️ Erreur lecture {LICENSES_FILE}: {e}")
     return {}
 
-# Licences de secours si le fichier n’est pas trouvé
+# Licences de secours
 DEFAULT_LICENSES = {
     "IA-TEST-BASIC": {"games": ["slot"]},
     "IA-TEST-PRO": {"games": ["slot", "duel", "race", "plinko"]},
@@ -37,10 +40,8 @@ DEFAULT_LICENSES = {
 # ============================================================
 # 🔹 MANIFEST JEUX (servi à l'application InterArcade)
 # ============================================================
-# ✅ On simplifie le format pour correspondre à ce qu'attend renderer.js
 GAMES_MANIFEST = {
     "games": ["slot"]
-    # "plinko", "duel", "race" à réactiver plus tard
 }
 
 # ============================================================
@@ -52,7 +53,7 @@ def health():
 
 @app.route("/verify_key", methods=["POST", "GET"])
 def verify_key():
-    """Vérifie si la clé et le pseudo sont autorisés (compatibilité double format)"""
+    """Vérifie si la clé et le pseudo sont autorisés"""
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or request.args.get("username") or "").strip()
     key = (data.get("key") or request.args.get("key") or "").strip()
@@ -62,40 +63,21 @@ def verify_key():
 
     licenses = load_licenses() or DEFAULT_LICENSES
 
-    # ✅ 1. Format (username, key)
+    # Formats de clé acceptés
     if (username, key) in licenses:
-        return jsonify({
-            "status": "authorized",
-            "username": username,
-            "games": licenses[(username, key)].get("games", [])
-        })
-
-    # ✅ 2. Format simple "IA-KEY"
+        return jsonify({"status": "authorized", "username": username, "games": licenses[(username, key)].get("games", [])})
     if key in licenses:
-        return jsonify({
-            "status": "authorized",
-            "username": username,
-            "games": licenses[key].get("games", [])
-        })
-
-    # ✅ 3. Format JSON : "username": {"key": "...", "games": [...]}
+        return jsonify({"status": "authorized", "username": username, "games": licenses[key].get("games", [])})
     if username in licenses and licenses[username].get("key") == key:
-        return jsonify({
-            "status": "authorized",
-            "username": username,
-            "games": licenses[username].get("games", [])
-        })
+        return jsonify({"status": "authorized", "username": username, "games": licenses[username].get("games", [])})
 
     print(f"⛔ Licence refusée : {username} / {key}")
     return jsonify({"status": "unauthorized"}), 200
 
-
-# ✅ Route manifest JSON pour l'application InterArcade
+# ✅ Manifest pour InterArcade
 @app.route("/games/manifest.json", methods=["GET"])
 def games_manifest():
-    """Manifest simple utilisé par l'application InterArcade"""
     return jsonify(GAMES_MANIFEST)
-
 
 # ============================================================
 # 🕹️ SERVEURS DES JEUX (HTML/CSS/JS)
@@ -128,8 +110,78 @@ def test_emit():
     return jsonify({"status": "ok", "sent": data})
 
 # ============================================================
-# 🚀 Lancement du serveur
+# 🔁 TIKTOK LISTENER INTÉGRÉ (dans le même service Render)
+# ============================================================
+def start_tiktok_listener():
+    """Lance le client TikTok Live dans un thread parallèle"""
+    import socketio as sio_client
+    from TikTokLive import TikTokLiveClient
+    from TikTokLive.events import GiftEvent, LikeEvent, CommentEvent, ConnectEvent, DisconnectEvent
+    from TikTokLive.client.errors import UserOfflineError
+
+    USERNAME = "songmicon"
+    BACKEND_URL = "https://plateforme-v2.onrender.com"
+
+    sio = sio_client.Client()
+
+    async def connect_socket():
+        while True:
+            try:
+                sio.connect(BACKEND_URL, transports=["websocket"])
+                print(f"🟢 Listener connecté à Render ({BACKEND_URL})")
+                break
+            except Exception as e:
+                print(f"❌ Tentative reconnexion Socket.IO: {e}")
+                await asyncio.sleep(5)
+
+    client = TikTokLiveClient(unique_id=USERNAME)
+
+    @client.on(GiftEvent)
+    async def on_gift(event: GiftEvent):
+        data = {
+            "type": "gift",
+            "username": event.user.unique_id,
+            "from": event.user.unique_id,
+            "gift": event.gift.name,
+            "count": event.repeat_count,
+            "streaking": event.repeat_end,
+        }
+        print(f"🎁 Listener: Cadeau reçu {data}")
+        try:
+            sio.emit("tiktok_event", data)
+        except Exception as e:
+            print(f"⚠️ Erreur d’émission: {e}")
+
+    @client.on(LikeEvent)
+    async def on_like(event: LikeEvent):
+        data = {"type": "like", "username": event.user.unique_id, "count": event.like_count}
+        sio.emit("tiktok_event", data)
+        print(f"❤️ Like reçu: {data}")
+
+    async def run_listener():
+        await connect_socket()
+        while True:
+            try:
+                print(f"🚀 Connexion au live TikTok @{USERNAME}")
+                await client.connect()
+                while getattr(client, "connected", True):
+                    await asyncio.sleep(2)
+            except UserOfflineError:
+                print("⚠️ Le live TikTok n’est pas en ligne, nouvelle tentative...")
+                await asyncio.sleep(10)
+            except Exception as e:
+                print(f"❌ Erreur TikTokListener: {e}")
+                await asyncio.sleep(5)
+
+    asyncio.run(run_listener())
+
+# ============================================================
+# 🚀 Lancement du serveur + listener
 # ============================================================
 if __name__ == "__main__":
     print("🚀 Serveur InterArcade Cloud prêt sur http://0.0.0.0:5000")
+
+    # 🧩 Lancement du listener en arrière-plan
+    threading.Thread(target=start_tiktok_listener, daemon=True).start()
+
     socketio.run(app, host="0.0.0.0", port=5000)
