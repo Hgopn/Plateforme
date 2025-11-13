@@ -1,5 +1,5 @@
 # ============================================================
-# ✅ secret.py — InterArcade Cloud (multi-utilisateurs TikTok + manifest + licences + serve static + rooms)
+# ✅ secret.py — InterArcade Cloud (multi-utilisateurs TikTok + manifest + licences + serve static + rooms + stop listener)
 # ============================================================
 import eventlet, json, os, threading, asyncio
 eventlet.monkey_patch()
@@ -110,22 +110,16 @@ def on_disconnect():
 # ============================================================
 @socketio.on("tiktok_event")
 def handle_tiktok_event(data):
-    """
-    data doit contenir la clé 'target' = pseudo du streamer (room).
-    On ne diffuse que dans la room du streamer.
-    """
     target = (data or {}).get("target")
     if target:
         socketio.emit("ia:event", data, to=target)
         print(f"📡 Relay vers room @{target} : {data}")
     else:
-        # Fallback: broadcast (éviter si possible)
         socketio.emit("ia:event", data)
         print(f"📡 Relay en broadcast (sans target) : {data}")
 
 @app.route("/test_emit")
 def test_emit():
-    # test vers une room spécifique si ?target=pseudo
     target = (request.args.get("target") or "").strip()
     data = {"type": "gift", "username": "test_user", "from": "test_user", "gift": "Rose", "count": 1, "target": target or None}
     print(f"🧪 Test manuel envoyé : {data}")
@@ -158,8 +152,7 @@ def start_listener_for(username: str):
     async def connect_socket():
         while True:
             try:
-                # le listener se connecte aussi avec ?username=<streamer>
-                sio.connect(BACKEND_URL, transports=["websocket"], headers={}, socketio_path="/socket.io", wait=True)
+                sio.connect(BACKEND_URL, transports=["websocket"])
                 print(f"🟢 Listener @{username} connecté à Render")
                 break
             except Exception as e:
@@ -170,7 +163,6 @@ def start_listener_for(username: str):
 
     @client.on(GiftEvent)
     async def on_gift(event: GiftEvent):
-        # n'émet qu'à la fin du streak
         if not event.repeat_end:
             return
         data = {
@@ -179,7 +171,6 @@ def start_listener_for(username: str):
             "from": event.user.unique_id,
             "gift": event.gift.name,
             "count": event.repeat_count,
-            # 🔑 cible la room du streamer
             "target": username,
         }
         print(f"🎁 Cadeau @{username}: {data}")
@@ -190,7 +181,9 @@ def start_listener_for(username: str):
 
     @client.on(LikeEvent)
     async def on_like(event: LikeEvent):
-        data = {"type": "like", "username": event.user.unique_id, "count": event.like_count, "target": username}
+        # ✅ correction pour éviter l'erreur Render (like_count supprimé)
+        count = getattr(event, "total_like_count", 1)
+        data = {"type": "like", "username": event.user.unique_id, "count": count, "target": username}
         sio.emit("tiktok_event", data)
         print(f"❤️ Like @{username}: {data}")
 
@@ -215,18 +208,32 @@ def start_listener_for(username: str):
     print(f"✅ Listener TikTok lancé pour @{username}")
 
 # ============================================================
-# 🌐 ROUTE API : DÉMARRER UN LISTENER POUR UN USER
+# 🌐 ROUTES API START / STOP LISTENERS
 # ============================================================
 @app.route("/start_listener", methods=["POST"])
 def start_listener_api():
-    """Démarre un listener TikTok pour le pseudo reçu"""
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     if not username:
         return jsonify({"status": "error", "reason": "missing_username"}), 400
-
     threading.Thread(target=start_listener_for, args=(username,), daemon=True).start()
     return jsonify({"status": "ok", "message": f"Listener TikTok lancé pour {username}"}), 200
+
+@app.route("/stop_listener", methods=["POST"])
+def stop_listener_api():
+    """Arrête un listener TikTok actif"""
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+
+    if not username:
+        return jsonify({"status": "error", "reason": "missing_username"}), 400
+
+    if username in listeners:
+        del listeners[username]
+        print(f"🧹 Listener TikTok arrêté pour @{username}")
+        return jsonify({"status": "stopped", "username": username}), 200
+
+    return jsonify({"status": "not_found", "username": username}), 404
 
 # ============================================================
 # 🚀 Lancement du serveur
