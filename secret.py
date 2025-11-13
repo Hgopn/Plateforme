@@ -20,15 +20,11 @@ CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 # ============================================================
-# 🔑 EULERSTREAM API KEY (TikTokLive v6.6.1)
+# 🔑 EULERSTREAM API KEY
 # ============================================================
-# ➜ Sur Render : ajouter une variable d’env :
-#    KEY   = EULER_API_KEY
-#    VALUE = ta longue clé Euler (hexadécimale)
 EULER_API_KEY = os.getenv("EULER_API_KEY")
 if not EULER_API_KEY:
-    print("⚠️  Aucune EULER_API_KEY détectée dans l'environnement. "
-          "TikTokLive utilisera le mode anonyme (risque de RATE_LIMIT).")
+    print("⚠️ Aucune EULER_API_KEY détectée → mode anonyme (risque RATE_LIMIT)")
 
 # ============================================================
 # 🔑 CHARGEMENT DES LICENCES
@@ -64,7 +60,6 @@ def games_manifest():
 # ============================================================
 @app.route("/health")
 def health():
-    """Simple check Render : doit renvoyer {status: ok}"""
     return jsonify({"status": "ok"})
 
 @app.route("/verify_key", methods=["POST", "GET"])
@@ -80,31 +75,25 @@ def verify_key():
     licenses = load_licenses() or DEFAULT_LICENSES
 
     if (username, key) in licenses:
-        return jsonify({
-            "status": "authorized",
-            "username": username,
-            "games": licenses[(username, key)].get("games", [])
-        })
+        return jsonify({"status": "authorized",
+                        "username": username,
+                        "games": licenses[(username, key)].get("games", [])})
 
     if key in licenses:
-        return jsonify({
-            "status": "authorized",
-            "username": username,
-            "games": licenses[key].get("games", [])
-        })
+        return jsonify({"status": "authorized",
+                        "username": username,
+                        "games": licenses[key].get("games", [])})
 
     if username in licenses and licenses[username].get("key") == key:
-        return jsonify({
-            "status": "authorized",
-            "username": username,
-            "games": licenses[username].get("games", [])
-        })
+        return jsonify({"status": "authorized",
+                        "username": username,
+                        "games": licenses[username].get("games", [])})
 
     print(f"⛔ Licence refusée : {username}/{key}")
     return jsonify({"status": "unauthorized"}), 200
 
 # ============================================================
-# 🕹️ SERVEURS DES JEUX (fichiers statiques)
+# 🕹️ SERVEURS DES JEUX (STATIC /games)
 # ============================================================
 @app.route("/games/<path:filename>")
 def serve_game_file(filename):
@@ -137,7 +126,7 @@ def on_disconnect():
         print(f"🔌 Client {request.sid} déconnecté")
 
 # ============================================================
-# 🎥 RELAIS ÉVÉNEMENTS TIKTOK → rooms
+# 🎥 RELAIS EVENTS TIKTOK → rooms
 # ============================================================
 @socketio.on("tiktok_event")
 def relay_event(data):
@@ -152,17 +141,15 @@ def relay_event(data):
 # ============================================================
 # 🔁 MULTI-LISTENER TIKTOK
 # ============================================================
-# listeners[username] = {"thread": Thread, "should_run": True}
 listeners = {}
 
 def start_listener_for(username: str):
-    """ Lance un listener TikTok pour un pseudo donné """
+    """Start a TikTok listener for a username"""
     import socketio as sio_client
     from TikTokLive import TikTokLiveClient
     from TikTokLive.events import GiftEvent, LikeEvent
     from TikTokLive.client.errors import UserOfflineError
 
-    # déjà en route ?
     if username in listeners and listeners[username].get("should_run"):
         print(f"⚠️ Listener déjà actif pour @{username}")
         return
@@ -183,13 +170,17 @@ def start_listener_for(username: str):
                 print(f"❌ SockErr @{username}: {e}")
                 await asyncio.sleep(5)
 
-    # ▶️ TikTokLiveClient avec ou sans clé Euler
+    # ============================================================
+    # ⚠️ FIX : TikTokLive 6.6.1 → plus de sign_api_key
+    # Injection correcte via variable d'environnement
+    # ============================================================
     if EULER_API_KEY:
-        client = TikTokLiveClient(unique_id=username, sign_api_key=EULER_API_KEY)
-        print(f"🔐 TikTokLive @{username} avec EulerStream")
+        os.environ["TIKTOKLIVE_SIGN_API_KEY"] = EULER_API_KEY
+        print(f"🔐 EulerStream activé @{username}")
     else:
-        client = TikTokLiveClient(unique_id=username)
-        print(f"⚠️ TikTokLive @{username} SANS EulerStream (anonyme)")
+        print(f"⚠️ @{username} en mode anonyme (risque RATE_LIMIT)")
+
+    client = TikTokLiveClient(unique_id=username)
 
     # --- Gift ---
     @client.on(GiftEvent)
