@@ -1,7 +1,7 @@
 # ============================================================
 # ✅ secret.py — InterArcade Cloud (Version STABLE)
 # Multi-utilisateurs, rooms, manifest, start/stop listeners
-# Compatible TikTokLive v6.6.1
+# Compatible TikTokLive v6.6.1 + EulerStream (via EULER_API_KEY)
 # ============================================================
 
 import eventlet
@@ -18,6 +18,17 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+
+# ============================================================
+# 🔑 EULERSTREAM API KEY (TikTokLive v6.6.1)
+# ============================================================
+# ➜ Sur Render : ajouter une variable d’env :
+#    KEY   = EULER_API_KEY
+#    VALUE = ta longue clé Euler (hexadécimale)
+EULER_API_KEY = os.getenv("EULER_API_KEY")
+if not EULER_API_KEY:
+    print("⚠️  Aucune EULER_API_KEY détectée dans l'environnement. "
+          "TikTokLive utilisera le mode anonyme (risque de RATE_LIMIT).")
 
 # ============================================================
 # 🔑 CHARGEMENT DES LICENCES
@@ -49,8 +60,13 @@ def games_manifest():
     return jsonify(GAMES_MANIFEST)
 
 # ============================================================
-# 🌐 ROUTES API : Vérification de licence
+# 🌐 ROUTES API : health + vérification de licence
 # ============================================================
+@app.route("/health")
+def health():
+    """Simple check Render : doit renvoyer {status: ok}"""
+    return jsonify({"status": "ok"})
+
 @app.route("/verify_key", methods=["POST", "GET"])
 def verify_key():
     data = request.get_json(silent=True) or {}
@@ -64,10 +80,25 @@ def verify_key():
     licenses = load_licenses() or DEFAULT_LICENSES
 
     if (username, key) in licenses:
-        return jsonify({"status": "authorized", "games": licenses[(username, key)]["games"]})
+        return jsonify({
+            "status": "authorized",
+            "username": username,
+            "games": licenses[(username, key)].get("games", [])
+        })
 
     if key in licenses:
-        return jsonify({"status": "authorized", "games": licenses[key]["games"]})
+        return jsonify({
+            "status": "authorized",
+            "username": username,
+            "games": licenses[key].get("games", [])
+        })
+
+    if username in licenses and licenses[username].get("key") == key:
+        return jsonify({
+            "status": "authorized",
+            "username": username,
+            "games": licenses[username].get("games", [])
+        })
 
     print(f"⛔ Licence refusée : {username}/{key}")
     return jsonify({"status": "unauthorized"}), 200
@@ -106,7 +137,7 @@ def on_disconnect():
         print(f"🔌 Client {request.sid} déconnecté")
 
 # ============================================================
-# 🎥 RELAIS ÉVÉNEMENTS TIKTOK
+# 🎥 RELAIS ÉVÉNEMENTS TIKTOK → rooms
 # ============================================================
 @socketio.on("tiktok_event")
 def relay_event(data):
@@ -121,8 +152,8 @@ def relay_event(data):
 # ============================================================
 # 🔁 MULTI-LISTENER TIKTOK
 # ============================================================
-listeners = {}  
-# listeners[username] = {"thread": X, "should_run": True}
+# listeners[username] = {"thread": Thread, "should_run": True}
+listeners = {}
 
 def start_listener_for(username: str):
     """ Lance un listener TikTok pour un pseudo donné """
@@ -131,7 +162,8 @@ def start_listener_for(username: str):
     from TikTokLive.events import GiftEvent, LikeEvent
     from TikTokLive.client.errors import UserOfflineError
 
-    if username in listeners and listeners[username]["should_run"]:
+    # déjà en route ?
+    if username in listeners and listeners[username].get("should_run"):
         print(f"⚠️ Listener déjà actif pour @{username}")
         return
 
@@ -142,7 +174,7 @@ def start_listener_for(username: str):
     BACKEND_URL = "https://plateforme-v2.onrender.com"
 
     async def maintain_socket():
-        while listeners[username]["should_run"]:
+        while listeners.get(username, {}).get("should_run", False):
             try:
                 sio.connect(BACKEND_URL, transports=["websocket"])
                 print(f"🟢 Socket connecté @{username}")
@@ -151,7 +183,13 @@ def start_listener_for(username: str):
                 print(f"❌ SockErr @{username}: {e}")
                 await asyncio.sleep(5)
 
-    client = TikTokLiveClient(unique_id=username)
+    # ▶️ TikTokLiveClient avec ou sans clé Euler
+    if EULER_API_KEY:
+        client = TikTokLiveClient(unique_id=username, sign_api_key=EULER_API_KEY)
+        print(f"🔐 TikTokLive @{username} avec EulerStream")
+    else:
+        client = TikTokLiveClient(unique_id=username)
+        print(f"⚠️ TikTokLive @{username} SANS EulerStream (anonyme)")
 
     # --- Gift ---
     @client.on(GiftEvent)
@@ -167,7 +205,10 @@ def start_listener_for(username: str):
             "target": username
         }
         print(f"🎁 Gift @{username}: {data}")
-        sio.emit("tiktok_event", data)
+        try:
+            sio.emit("tiktok_event", data)
+        except Exception as e:
+            print(f"⚠️ Emit gift err @{username}: {e}")
 
     # --- Like ---
     @client.on(LikeEvent)
@@ -180,27 +221,34 @@ def start_listener_for(username: str):
             "target": username
         }
         print(f"❤️ Like @{username}: {data}")
-        sio.emit("tiktok_event", data)
+        try:
+            sio.emit("tiktok_event", data)
+        except Exception as e:
+            print(f"⚠️ Emit like err @{username}: {e}")
 
     # --- Main loop ---
     async def run():
         await maintain_socket()
-        while listeners[username]["should_run"]:
+        while listeners.get(username, {}).get("should_run", False):
             try:
                 print(f"📡 Connexion Live @{username}")
                 await client.connect()
 
-                while client.connected and listeners[username]["should_run"]:
+                while getattr(client, "connected", True) and listeners.get(username, {}).get("should_run", False):
                     await asyncio.sleep(1)
 
-                if not listeners[username]["should_run"]:
+                if not listeners.get(username, {}).get("should_run", False):
                     break
 
             except UserOfflineError:
+                if not listeners.get(username, {}).get("should_run", False):
+                    break
                 print(f"⚠️ @{username} offline, retry 10s")
                 await asyncio.sleep(10)
 
             except Exception as e:
+                if not listeners.get(username, {}).get("should_run", False):
+                    break
                 print(f"❌ ListenerErr @{username}: {e}")
                 await asyncio.sleep(5)
 
@@ -216,22 +264,25 @@ def start_listener_for(username: str):
 # ============================================================
 @app.route("/start_listener", methods=["POST"])
 def api_start():
-    username = (request.json or {}).get("username", "").strip()
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
     if not username:
         return jsonify({"status": "error", "reason": "missing_username"}), 400
+
     threading.Thread(target=start_listener_for, args=(username,), daemon=True).start()
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "ok", "message": f"listener_started_for_{username}"})
 
 @app.route("/stop_listener", methods=["POST"])
 def api_stop():
-    username = (request.json or {}).get("username", "").strip()
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
 
     if username not in listeners:
-        return jsonify({"status": "not_found"}), 404
+        return jsonify({"status": "not_found", "username": username}), 404
 
     listeners[username]["should_run"] = False
     print(f"🧹 Stop requested @{username}")
-    return jsonify({"status": "stopping"})
+    return jsonify({"status": "stopping", "username": username})
 
 # ============================================================
 # 🚀 Lancement serveur
