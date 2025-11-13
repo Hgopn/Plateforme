@@ -1,9 +1,13 @@
 # ============================================================
-# ✅ secret.py — InterArcade Cloud (multi-utilisateurs TikTok + manifest + licences + serve static + rooms + stop listener)
+# ✅ secret.py — InterArcade Cloud (Version STABLE)
+# Multi-utilisateurs, rooms, manifest, start/stop listeners
+# Compatible TikTokLive v6.6.1
 # ============================================================
-import eventlet, json, os, threading, asyncio
+
+import eventlet
 eventlet.monkey_patch()
 
+import os, json, threading, asyncio
 from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, join_room, leave_room
 from flask_cors import CORS
@@ -40,16 +44,17 @@ DEFAULT_LICENSES = {
 # ============================================================
 GAMES_MANIFEST = {"games": ["slot"]}
 
-# ============================================================
-# 🌐 ROUTES API
-# ============================================================
-@app.route("/health")
-def health():
-    return jsonify({"status": "ok"})
+@app.route("/games/manifest.json")
+def games_manifest():
+    return jsonify(GAMES_MANIFEST)
 
+# ============================================================
+# 🌐 ROUTES API : Vérification de licence
+# ============================================================
 @app.route("/verify_key", methods=["POST", "GET"])
 def verify_key():
     data = request.get_json(silent=True) or {}
+
     username = (data.get("username") or request.args.get("username") or "").strip()
     key = (data.get("key") or request.args.get("key") or "").strip()
 
@@ -59,108 +64,96 @@ def verify_key():
     licenses = load_licenses() or DEFAULT_LICENSES
 
     if (username, key) in licenses:
-        return jsonify({"status": "authorized", "username": username, "games": licenses[(username, key)].get("games", [])})
-    if key in licenses:
-        return jsonify({"status": "authorized", "username": username, "games": licenses[key].get("games", [])})
-    if username in licenses and licenses[username].get("key") == key:
-        return jsonify({"status": "authorized", "username": username, "games": licenses[username].get("games", [])})
+        return jsonify({"status": "authorized", "games": licenses[(username, key)]["games"]})
 
-    print(f"⛔ Licence refusée : {username} / {key}")
+    if key in licenses:
+        return jsonify({"status": "authorized", "games": licenses[key]["games"]})
+
+    print(f"⛔ Licence refusée : {username}/{key}")
     return jsonify({"status": "unauthorized"}), 200
 
-@app.route("/games/manifest.json")
-def games_manifest():
-    return jsonify(GAMES_MANIFEST)
-
 # ============================================================
-# 🕹️ SERVEURS DES JEUX
+# 🕹️ SERVEURS DES JEUX (fichiers statiques)
 # ============================================================
 @app.route("/games/<path:filename>")
 def serve_game_file(filename):
-    games_dir = os.path.join(os.getcwd(), "games")
-    file_path = os.path.join(games_dir, filename)
-    if not os.path.exists(file_path):
-        print(f"❌ Fichier introuvable : {file_path}")
-        return jsonify({"error": "Fichier introuvable", "path": filename}), 404
-    return send_from_directory(games_dir, filename)
+    base = os.path.join(os.getcwd(), "games")
+    full = os.path.join(base, filename)
+    if not os.path.exists(full):
+        print(f"❌ Fichier introuvable : {filename}")
+        return jsonify({"error": "not_found", "path": filename}), 404
+    return send_from_directory(base, filename)
 
 # ============================================================
-# 🔐 ROOMS PAR PSEUDO — connexion des clients
+# 🔐 SOCKET.IO : rooms par utilisateur
 # ============================================================
 @socketio.on("connect")
 def on_connect():
     username = (request.args.get("username") or "").strip()
     if username:
         join_room(username)
-        print(f"🔌 Client {request.sid} rejoint la room @{username}")
+        print(f"🔌 Client {request.sid} rejoint @{username}")
     else:
-        print(f"🔌 Client {request.sid} connecté (sans username)")
+        print(f"🔌 Client {request.sid} connecté sans username")
 
 @socketio.on("disconnect")
 def on_disconnect():
     username = (request.args.get("username") or "").strip()
     if username:
         leave_room(username)
-        print(f"🔌 Client {request.sid} quitte la room @{username}")
+        print(f"🔌 Client {request.sid} quitte @{username}")
     else:
         print(f"🔌 Client {request.sid} déconnecté")
 
 # ============================================================
-# 🎥 RELAIS D'ÉVÉNEMENTS TIKTOK (ciblage par room)
+# 🎥 RELAIS ÉVÉNEMENTS TIKTOK
 # ============================================================
 @socketio.on("tiktok_event")
-def handle_tiktok_event(data):
+def relay_event(data):
     target = (data or {}).get("target")
     if target:
-        socketio.emit("ia:event", data, to=target)
-        print(f"📡 Relay vers room @{target} : {data}")
-    else:
-        socketio.emit("ia:event", data)
-        print(f"📡 Relay en broadcast (sans target) : {data}")
-
-@app.route("/test_emit")
-def test_emit():
-    target = (request.args.get("target") or "").strip()
-    data = {"type": "gift", "username": "test_user", "from": "test_user", "gift": "Rose", "count": 1, "target": target or None}
-    print(f"🧪 Test manuel envoyé : {data}")
-    if target:
+        print(f"📡 Relay vers @{target} : {data}")
         socketio.emit("ia:event", data, to=target)
     else:
+        print(f"📡 Relay global : {data}")
         socketio.emit("ia:event", data)
-    return jsonify({"status": "ok", "sent": data})
 
 # ============================================================
-# 🔁 MULTI-LISTENERS TIKTOK (un par utilisateur)
+# 🔁 MULTI-LISTENER TIKTOK
 # ============================================================
-listeners = {}
+listeners = {}  
+# listeners[username] = {"thread": X, "should_run": True}
 
 def start_listener_for(username: str):
-    """Lance un listener TikTok pour un pseudo donné"""
+    """ Lance un listener TikTok pour un pseudo donné """
     import socketio as sio_client
     from TikTokLive import TikTokLiveClient
-    from TikTokLive.events import GiftEvent, LikeEvent, CommentEvent, ConnectEvent, DisconnectEvent
+    from TikTokLive.events import GiftEvent, LikeEvent
     from TikTokLive.client.errors import UserOfflineError
 
-    if username in listeners:
+    if username in listeners and listeners[username]["should_run"]:
         print(f"⚠️ Listener déjà actif pour @{username}")
         return
 
-    print(f"🚀 Démarrage du listener TikTok pour @{username}")
+    print(f"🚀 Start listener @{username}")
+    listeners[username] = {"thread": None, "should_run": True}
+
     sio = sio_client.Client()
     BACKEND_URL = "https://plateforme-v2.onrender.com"
 
-    async def connect_socket():
-        while True:
+    async def maintain_socket():
+        while listeners[username]["should_run"]:
             try:
                 sio.connect(BACKEND_URL, transports=["websocket"])
-                print(f"🟢 Listener @{username} connecté à Render")
+                print(f"🟢 Socket connecté @{username}")
                 break
             except Exception as e:
-                print(f"❌ Reconnexion Socket.IO @{username}: {e}")
+                print(f"❌ SockErr @{username}: {e}")
                 await asyncio.sleep(5)
 
     client = TikTokLiveClient(unique_id=username)
 
+    # --- Gift ---
     @client.on(GiftEvent)
     async def on_gift(event: GiftEvent):
         if not event.repeat_end:
@@ -171,74 +164,79 @@ def start_listener_for(username: str):
             "from": event.user.unique_id,
             "gift": event.gift.name,
             "count": event.repeat_count,
-            "target": username,
+            "target": username
         }
-        print(f"🎁 Cadeau @{username}: {data}")
-        try:
-            sio.emit("tiktok_event", data)
-        except Exception as e:
-            print(f"⚠️ Erreur émission @{username}: {e}")
+        print(f"🎁 Gift @{username}: {data}")
+        sio.emit("tiktok_event", data)
 
+    # --- Like ---
     @client.on(LikeEvent)
     async def on_like(event: LikeEvent):
-        # ✅ correction pour éviter l'erreur Render (like_count supprimé)
         count = getattr(event, "total_like_count", 1)
-        data = {"type": "like", "username": event.user.unique_id, "count": count, "target": username}
-        sio.emit("tiktok_event", data)
+        data = {
+            "type": "like",
+            "username": event.user.unique_id,
+            "count": count,
+            "target": username
+        }
         print(f"❤️ Like @{username}: {data}")
+        sio.emit("tiktok_event", data)
 
-    async def run_listener():
-        await connect_socket()
-        while True:
+    # --- Main loop ---
+    async def run():
+        await maintain_socket()
+        while listeners[username]["should_run"]:
             try:
-                print(f"📡 Connexion au live TikTok @{username}")
+                print(f"📡 Connexion Live @{username}")
                 await client.connect()
-                while getattr(client, "connected", True):
-                    await asyncio.sleep(2)
+
+                while client.connected and listeners[username]["should_run"]:
+                    await asyncio.sleep(1)
+
+                if not listeners[username]["should_run"]:
+                    break
+
             except UserOfflineError:
-                print(f"⚠️ @{username} offline, reconnexion dans 10s...")
+                print(f"⚠️ @{username} offline, retry 10s")
                 await asyncio.sleep(10)
+
             except Exception as e:
-                print(f"❌ Erreur TikTok @{username}: {e}")
+                print(f"❌ ListenerErr @{username}: {e}")
                 await asyncio.sleep(5)
 
-    thread = threading.Thread(target=lambda: asyncio.run(run_listener()), daemon=True)
+        print(f"🧹 Listener terminé @{username}")
+
+    thread = threading.Thread(target=lambda: asyncio.run(run()), daemon=True)
     thread.start()
-    listeners[username] = thread
-    print(f"✅ Listener TikTok lancé pour @{username}")
+    listeners[username]["thread"] = thread
+    print(f"✅ Listener lancé @{username}")
 
 # ============================================================
-# 🌐 ROUTES API START / STOP LISTENERS
+# 🌐 API START/STOP
 # ============================================================
 @app.route("/start_listener", methods=["POST"])
-def start_listener_api():
-    data = request.get_json(silent=True) or {}
-    username = (data.get("username") or "").strip()
+def api_start():
+    username = (request.json or {}).get("username", "").strip()
     if not username:
         return jsonify({"status": "error", "reason": "missing_username"}), 400
     threading.Thread(target=start_listener_for, args=(username,), daemon=True).start()
-    return jsonify({"status": "ok", "message": f"Listener TikTok lancé pour {username}"}), 200
+    return jsonify({"status": "ok"})
 
 @app.route("/stop_listener", methods=["POST"])
-def stop_listener_api():
-    """Arrête un listener TikTok actif"""
-    data = request.get_json(silent=True) or {}
-    username = (data.get("username") or "").strip()
+def api_stop():
+    username = (request.json or {}).get("username", "").strip()
 
-    if not username:
-        return jsonify({"status": "error", "reason": "missing_username"}), 400
+    if username not in listeners:
+        return jsonify({"status": "not_found"}), 404
 
-    if username in listeners:
-        del listeners[username]
-        print(f"🧹 Listener TikTok arrêté pour @{username}")
-        return jsonify({"status": "stopped", "username": username}), 200
-
-    return jsonify({"status": "not_found", "username": username}), 404
+    listeners[username]["should_run"] = False
+    print(f"🧹 Stop requested @{username}")
+    return jsonify({"status": "stopping"})
 
 # ============================================================
-# 🚀 Lancement du serveur
+# 🚀 Lancement serveur
 # ============================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"🚀 Serveur InterArcade Cloud prêt sur http://0.0.0.0:{port}")
+    print(f"🚀 InterArcade Cloud → port {port}")
     socketio.run(app, host="0.0.0.0", port=port)
