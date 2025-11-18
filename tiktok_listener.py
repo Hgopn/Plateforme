@@ -8,7 +8,7 @@ from TikTokLive import TikTokLiveClient
 from TikTokLive.events import GiftEvent, LikeEvent, CommentEvent, ConnectEvent, DisconnectEvent
 from TikTokLive.client.errors import UserOfflineError
 
-USERNAME = "songmicon"
+USERNAME = None
 BACKEND_URL = "http://51.38.238.227:5000"
 
 # === Connexion Socket.IO vers Render ===
