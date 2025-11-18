@@ -158,7 +158,7 @@ def start_listener_for(username: str):
     listeners[username] = {"thread": None, "should_run": True}
 
     sio = sio_client.Client()
-    BACKEND_URL = "https://plateforme-v2.onrender.com"
+    BACKEND_URL = "http://51.38.238.227:5000"
 
     async def maintain_socket():
         while listeners.get(username, {}).get("should_run", False):
