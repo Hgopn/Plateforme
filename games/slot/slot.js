@@ -106,7 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // === 🔗 Connexion Socket.IO à Render ===
   let socket = null;
   try {
-    socket = io("https://plateforme-v2.onrender.com", { transports: ["websocket"] });
+    socket = io("http://51.38.238.227:5000", { transports: ["websocket"] });
 
     socket.on("connect", () => {
       console.log("🟢 Connecté à Render via Socket.IO");
