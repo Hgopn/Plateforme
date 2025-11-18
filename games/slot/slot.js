@@ -1,5 +1,5 @@
 // ======================================================
-// slot.js — Machine à sous InterArcade (Render + TikTok Live compatible)
+// slot.js — Machine à sous InterArcade (OVH + TikTok Live)
 // ======================================================
 
 // --- Variables globales ---
@@ -22,7 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ipcRenderer = electron.ipcRenderer;
     }
   } catch {
-    console.warn("⚠️ ipcRenderer non disponible (mode Render).");
+    console.warn("⚠️ ipcRenderer non disponible (mode navigateur).");
   }
 
   // === FILE D’ATTENTE DE SPINS ===
@@ -103,25 +103,43 @@ document.addEventListener("DOMContentLoaded", () => {
     enqueueSpin({ from: "Test", gift: "Manuel", count: 1 });
   });
 
-  // === 🔗 Connexion Socket.IO à Render ===
+  // ======================================================
+  // 🔗 Connexion Socket.IO vers ton serveur OVH (InterArcade)
+  // ======================================================
+
+  // Récupération du username depuis l'URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const USERNAME = urlParams.get("username") || "songmicon";
+
+  const SOCKET_URL = "http://51.38.238.227:5000";
+
   let socket = null;
   try {
-    socket = io("http://51.38.238.227:5000", { transports: ["websocket"] });
+    console.log("[SLOT] Connexion Socket.IO à", SOCKET_URL, "user =", USERNAME);
+
+    socket = io(SOCKET_URL, {
+      transports: ["websocket"],
+      query: { username: USERNAME }
+    });
 
     socket.on("connect", () => {
-      console.log("🟢 Connecté à Render via Socket.IO");
+      console.log("🟢 [SLOT] Connecté au backend OVH, id:", socket.id);
     });
 
     socket.on("disconnect", () => {
-      console.warn("🔴 Déconnecté de Render");
+      console.warn("🔴 [SLOT] Déconnecté du backend OVH");
     });
 
-    // 🎁 Événements TikTok Live reçus depuis Render
+    // 🎁 Réception des événements TikTok depuis secret.py
     socket.on("ia:event", (data) => {
-      console.log("🎁 Événement TikTok reçu depuis Render :", data);
-      enqueueSpin(data);
+      console.log("📩 [SLOT] Event reçu :", data);
+
+      if (data && data.type === "gift") {
+        enqueueSpin(data);
+      }
     });
+
   } catch (err) {
-    console.error("❌ Erreur connexion Socket.IO :", err);
+    console.error("❌ Erreur Socket.IO :", err);
   }
 });
