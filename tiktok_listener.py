@@ -1,5 +1,5 @@
 # ============================================================
-# ✅ tiktok_listener.py — version stable finale (TikTok → Render → InterArcade)
+# tiktok_listener.py — version dynamique du username TikTok
 # ============================================================
 
 import asyncio
@@ -8,7 +8,6 @@ from TikTokLive import TikTokLiveClient
 from TikTokLive.events import GiftEvent, LikeEvent, CommentEvent, ConnectEvent, DisconnectEvent
 from TikTokLive.client.errors import UserOfflineError
 
-USERNAME = None
 BACKEND_URL = "http://51.38.238.227:5000"
 
 # === Connexion Socket.IO vers Render ===
@@ -32,8 +31,18 @@ async def connect_socket():
             print(f"❌ Échec connexion Render: {e}")
             await asyncio.sleep(5)
 
-# === Connexion TikTok ===
-client = TikTokLiveClient(unique_id=USERNAME)
+# === Client TikTok (SANS unique_id fixe) ===
+client = TikTokLiveClient()
+
+# Variable modifiable dynamiquement
+USERNAME = None
+
+def set_username(username: str):
+    """Fonction appelée par le backend pour définir le pseudo TikTok"""
+    global USERNAME, client
+    USERNAME = username
+    client.unique_id = username
+    print(f"🔄 Nouveau pseudo TikTok défini : @{USERNAME}")
 
 # === ÉVÉNEMENTS ===
 @client.on(ConnectEvent)
@@ -49,7 +58,7 @@ async def on_gift(event: GiftEvent):
     data = {
         "type": "gift",
         "username": event.user.unique_id,
-        "from": event.user.unique_id,  # ✅ clé ajoutée pour compatibilité slot.js
+        "from": event.user.unique_id,
         "gift": event.gift.name,
         "count": event.repeat_count,
         "streaking": event.repeat_end
@@ -67,7 +76,7 @@ async def on_like(event: LikeEvent):
         "type": "like",
         "username": event.user.unique_id,
         "from": event.user.unique_id,
-        "count": event.like_count
+        "count": getattr(event, "like_count", None)  # laisser tel quel pour l'instant
     }
     print(f"❤️ Like reçu: {data}")
     try:
@@ -91,11 +100,14 @@ async def on_comment(event: CommentEvent):
 
 # === BOUCLE PRINCIPALE ===
 async def run_client():
-    # 1️⃣ Connexion à Render
     await connect_socket()
 
-    # 2️⃣ Connexion continue à TikTok
     while True:
+        if USERNAME is None:
+            print("⏳ Aucun pseudo défini — en attente de set_username() ...")
+            await asyncio.sleep(2)
+            continue
+
         try:
             print(f"🚀 Connexion au live TikTok de @{USERNAME} ...")
             await client.connect()
