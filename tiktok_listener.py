@@ -31,8 +31,8 @@ async def connect_socket():
             print(f"❌ Échec connexion Render: {e}")
             await asyncio.sleep(5)
 
-# === Client TikTok (SANS unique_id fixe) ===
-client = TikTokLiveClient()
+# === Client TikTok (ancienne version → unique_id obligatoire)
+client = TikTokLiveClient(unique_id="placeholder")
 
 # Variable modifiable dynamiquement
 USERNAME = None
