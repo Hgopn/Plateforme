@@ -245,7 +245,14 @@ def start_listener_for(username: str):
 
         print(f"🧹 Listener terminé @{username}")
 
-    thread = threading.Thread(target=lambda: asyncio.run(run()), daemon=True)
+    # ✅ CORRECTION ICI : plus de asyncio.run() dans un thread
+    def _run_async(coro):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(coro)
+        loop.close()
+
+    thread = threading.Thread(target=_run_async, args=(run(),), daemon=True)
     thread.start()
     listeners[username]["thread"] = thread
     print(f"✅ Listener lancé @{username}")
