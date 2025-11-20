@@ -1,5 +1,58 @@
 console.log("DARK.JS chargé");
 
+// ==================================
+// 🔗 CONNEXION AU BACKEND INTERARCADE
+// ==================================
+let ipcRenderer = null;
+let socket = null;
+
+// Compatibilité Electron
+try {
+  if (window.require) {
+    const electron = window.require("electron");
+    ipcRenderer = electron.ipcRenderer;
+  }
+} catch {
+  console.warn("ipcRenderer non disponible (navigateur)");
+}
+
+// Récupération username (comme Slot)
+const urlParams = new URLSearchParams(window.location.search);
+const USERNAME = urlParams.get("username") || "songmicon";
+
+// Backend OVH
+const SOCKET_URL = "http://51.38.238.227:5000";
+
+// Connexion Socket.IO
+try {
+  console.log("🔌 [DARK] Connexion Socket.IO à", SOCKET_URL);
+
+  socket = io(SOCKET_URL, {
+    transports: ["websocket"],
+    query: { username: USERNAME }
+  });
+
+  socket.on("connect", () => {
+    console.log("🟢 [DARK] Connecté au backend OVH");
+  });
+
+  socket.on("disconnect", () => {
+    console.warn("🔴 [DARK] Déconnecté du backend OVH");
+  });
+
+  // 🎁 Réception des événements TikTok
+  socket.on("ia:event", (data) => {
+    console.log("📩 [DARK] Event reçu :", data);
+
+    if (data && data.type === "gift") onGiftEvent(data);
+    if (data && data.type === "like") onLikeEvent(data);
+  });
+
+} catch (err) {
+  console.error("❌ Erreur Socket.IO :", err);
+}
+
+
 // 🔥 AJOUT — Niveau affiché en haut
 let currentLevel = 0;  
 function updateLevelDisplay() {
@@ -7,10 +60,10 @@ function updateLevelDisplay() {
   if (el) el.textContent = "LEVEL " + (currentLevel + 1);
 }
 
-// ========================
+
+// ==================================
 // 🧩 NIVEAUX (LEVEL 1 + LEVEL 2)
-// 0 = mur, 1 = chemin, 2 = sortie, 3 = spawn
-// ========================
+// ==================================
 const LEVELS = [
   // LEVEL 1 — 10×10
   [
@@ -97,9 +150,14 @@ function initPlayerFromSpawn() {
 
 renderMaze();
 initPlayerFromSpawn();
-
-// 🔥 AJOUT
 updateLevelDisplay();
+
+
+// ==================================
+// 🌑 VARIABLES POUR EFFETS TIKTOK
+// ==================================
+let currentLightRadius = tileSize * 1.4;
+let shakeIntensity = 2;
 
 
 // ========================
@@ -133,10 +191,10 @@ function drawLight() {
   let cx = player.x * tileSize + tileSize / 2;
   let cy = player.y * tileSize + tileSize / 2;
 
-  cx += (Math.random() - 0.5) * 2;
-  cy += (Math.random() - 0.5) * 2;
+  cx += (Math.random() - 0.5) * shakeIntensity;
+  cy += (Math.random() - 0.5) * shakeIntensity;
 
-  const radius = tileSize * 1.4;
+  const radius = currentLightRadius;
 
   ctx.globalCompositeOperation = "destination-out";
   ctx.beginPath();
@@ -164,8 +222,6 @@ function nextLevel() {
   map = LEVELS[currentLevel];
   renderMaze();
   initPlayerFromSpawn();
-
-  // 🔥 AJOUT
   updateLevelDisplay();
 }
 
@@ -209,3 +265,68 @@ document.querySelectorAll("#controls button").forEach(btn => {
     if (dir === "right") move(1, 0);
   });
 });
+
+
+// ==================================
+// 🎁 EFFETS DES CADEAUX
+// ==================================
+function onGiftEvent(event) {
+  const gift = event.gift || "";
+  const count = event.count || 1;
+
+  console.log("🎁 Cadeau :", gift, "x" + count);
+
+  radiusBoost(count);
+
+  if (gift.toLowerCase().includes("pistolet")) {
+    flashScreen();
+  }
+}
+
+// ==================================
+// ❤️ EFFETS DES LIKES
+// ==================================
+function onLikeEvent(event) {
+  console.log("❤️ Like reçu :", event.count);
+  lightShakeBoost();
+}
+
+
+// ➕ AMPLIFICATION DE LA LUMIÈRE
+function radiusBoost(power) {
+  const oldRadius = tileSize * 1.4;
+  const boosted = oldRadius + (power * 10);
+  currentLightRadius = boosted;
+
+  setTimeout(() => {
+    currentLightRadius = oldRadius;
+  }, 1500);
+}
+
+// ➕ BOOST TREMBLEMENT
+function lightShakeBoost() {
+  shakeIntensity = 4;
+  setTimeout(() => {
+    shakeIntensity = 2;
+  }, 1000);
+}
+
+// ⚡ FLASH LUMINEUX
+function flashScreen() {
+  const flash = document.createElement("div");
+  flash.style.position = "absolute";
+  flash.style.top = "0";
+  flash.style.left = "0";
+  flash.style.width = "500px";
+  flash.style.height = "500px";
+  flash.style.background = "white";
+  flash.style.opacity = "1";
+  flash.style.zIndex = "10";
+  flash.style.transition = "opacity 0.3s";
+  document.getElementById("game-container").appendChild(flash);
+
+  setTimeout(() => {
+    flash.style.opacity = "0";
+    setTimeout(() => flash.remove(), 300);
+  }, 50);
+}
