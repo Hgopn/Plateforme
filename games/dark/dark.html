@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Dans le Noir – Niveau</title>
+  <link rel="stylesheet" href="dark.css">
+</head>
+<body>
+
+  <div id="level-display">LEVEL 1</div>
+  <div id="game-container">
+
+    <!-- 🧱 Labyrinthe -->
+    <div id="maze"></div>
+
+    <!-- ⚫ Lumière gérée UNIQUEMENT par canvas (ajouté via JS) -->
+
+  </div>
+
+  <!-- 🎮 Boutons -->
+  <div id="controls">
+  <div class="row">
+    <button data-dir="up">⬆️</button>
+  </div>
+
+  <div class="row">
+    <button data-dir="left">⬅️</button>
+    <button data-dir="right">➡️</button>
+  </div>
+
+  <div class="row">
+    <button data-dir="down">⬇️</button>
+  </div>
+</div>
+
+  <script src="dark.js"></script>
+</body>
+</html>

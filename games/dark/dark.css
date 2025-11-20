@@ -1,0 +1,94 @@
+/* =============================
+   GLOBAL
+============================= */
+body {
+  background: #000;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+/* 🔥 AJOUT — Texte du niveau */
+#level-display {
+  font-size: 28px;
+  font-weight: bold;
+  margin-top: 15px;
+  margin-bottom: 10px;
+  text-shadow: 0 0 10px #fff;
+}
+
+
+/* =============================
+   CONTAINER
+============================= */
+#game-container {
+  position: relative;
+  width: 500px;
+  height: 500px;
+  overflow: hidden;
+  border: 2px solid #333;
+}
+
+
+/* =============================
+   LABYRINTHE
+============================= */
+#maze {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  display: grid;
+  grid-template-columns: repeat(10, 50px);
+  grid-template-rows: repeat(10, 50px);
+  z-index: 1;
+}
+
+.cell {
+  width: 50px;
+  height: 50px;
+}
+
+.wall {
+  background: #222;
+}
+
+.path {
+  background: #000;
+}
+
+
+/* =============================
+   CONTROLES EN PAD
+============================= */
+#controls {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+#controls .row {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+#controls button {
+  width: 70px;
+  height: 70px;
+  font-size: 32px;
+  border-radius: 10px;
+  background: #222;
+  color: white;
+  border: 2px solid #555;
+  cursor: pointer;
+}
+
+#controls button:active {
+  background: #444;
+  transform: scale(0.95);
+}
