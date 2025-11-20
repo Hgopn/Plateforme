@@ -1,13 +1,13 @@
 {
   "IA-TEST-BASIC": {
-    "games": ["slot"]
+    "games": ["slot","dark"]
   },
   "IA-TEST-PRO": {
     "games": ["slot", "duel", "race", "plinko"]
   },
   "songmicon": {
     "key": "IA-SONGMI-PRO",
-    "games": ["slot", "duel", "plinko", "race"]
+    "games": ["slot", "duel", "plinko", "race","dark"]
   },
   "creatorX": {
     "key": "IA-CRX-SLOT",

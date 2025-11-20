@@ -49,7 +49,7 @@ DEFAULT_LICENSES = {
 # ============================================================
 # 🔹 MANIFEST JEUX
 # ============================================================
-GAMES_MANIFEST = {"games": ["slot"]}
+GAMES_MANIFEST = {"games": ["slot","dark"]}
 
 @app.route("/games/manifest.json")
 def games_manifest():
