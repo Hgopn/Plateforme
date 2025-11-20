@@ -65,7 +65,7 @@ body {
 ============================= */
 #controls {
   position: absolute;
-  right: -50px;          /* décalage à droite du jeu */
+  right: 0px;          /* décalage à droite du jeu */
   top: 50%;               /* centré verticalement */
   transform: translateY(-50%);
   display: flex;
