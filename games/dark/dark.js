@@ -53,18 +53,28 @@ try {
 }
 
 
+// ==================================
+// 🔥 Lumière & tremblements
+// ==================================
+let baseLightRadius = 0.9;        // plus petit = plus difficile
+let currentLightRadius = baseLightRadius;
+let shakeIntensity = 2;
+
+// ==================================
 // 🔥 AJOUT — Niveau affiché en haut
-let currentLevel = 0;  
+// ==================================
+let currentLevel = 0;
 function updateLevelDisplay() {
   const el = document.getElementById("level-display");
   if (el) el.textContent = "LEVEL " + (currentLevel + 1);
 }
 
-
-// ==================================
-// 🧩 NIVEAUX (LEVEL 1 + LEVEL 2)
-// ==================================
+// ========================
+// 🧩 NIVEAUX
+// 0 = mur, 1 = chemin, 2 = sortie, 3 = spawn
+// ========================
 const LEVELS = [
+
   // LEVEL 1 — 10×10
   [
     [1,1,1,1,1,1,1,1,1,1],
@@ -96,7 +106,27 @@ const LEVELS = [
     [1,1,1,0,1,0,1,0,1,1,1,0,1,0,1],
     [1,0,0,0,0,0,1,0,0,0,1,0,0,2,1],
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+  ],
+
+  // LEVEL 3 — 15×15 (simple)
+  [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,3,0,0,0,0,1,0,0,0,1,0,0,0,1],
+    [1,0,1,1,1,0,1,0,1,0,1,0,1,0,1],
+    [1,0,1,0,0,0,1,0,1,0,1,0,1,0,1],
+    [1,0,1,0,1,1,1,0,1,0,1,0,1,0,1],
+    [1,0,0,0,0,0,0,0,1,0,0,0,0,0,1],
+    [1,1,1,1,1,1,0,1,1,1,1,1,1,0,1],
+    [1,0,0,0,0,0,0,1,0,0,0,1,0,0,1],
+    [1,0,1,1,1,1,0,1,1,1,0,1,1,0,1],
+    [1,0,1,0,0,0,0,0,0,1,0,0,1,0,1],
+    [1,0,1,0,1,1,1,1,0,1,1,0,1,0,1],
+    [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
+    [1,1,1,0,1,1,1,0,1,1,1,0,1,0,1],
+    [1,0,0,0,0,0,0,0,0,0,1,0,0,2,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
   ]
+
 ];
 
 let map = LEVELS[0];
@@ -153,13 +183,6 @@ initPlayerFromSpawn();
 updateLevelDisplay();
 
 
-// ==================================
-// 🌑 VARIABLES POUR EFFETS TIKTOK
-// ==================================
-let currentLightRadius = tileSize * 1.4;
-let shakeIntensity = 2;
-
-
 // ========================
 // 🌑 CANVAS + LUMIÈRE
 // ========================
@@ -194,7 +217,7 @@ function drawLight() {
   cx += (Math.random() - 0.5) * shakeIntensity;
   cy += (Math.random() - 0.5) * shakeIntensity;
 
-  const radius = currentLightRadius;
+  const radius = tileSize * currentLightRadius;
 
   ctx.globalCompositeOperation = "destination-out";
   ctx.beginPath();
@@ -271,47 +294,56 @@ document.querySelectorAll("#controls button").forEach(btn => {
 // 🎁 EFFETS DES CADEAUX
 // ==================================
 function onGiftEvent(event) {
-  const gift = event.gift || "";
+  const gift = event.gift?.toLowerCase() || "";
   const count = event.count || 1;
 
   console.log("🎁 Cadeau :", gift, "x" + count);
 
-  radiusBoost(count);
+  // Rose → +10% lumière 1 sec
+  if (gift.includes("rose")) {
+    radiusTemporaryBoost(0.10, 1000);
+  }
 
-  if (gift.toLowerCase().includes("pistolet")) {
+  // Pistolet → flash
+  if (gift.includes("pistolet")) {
     flashScreen();
   }
+
+  // Tous les cadeaux → petit boost court
+  radiusTemporaryBoost(0.05 * count, 600);
 }
+
 
 // ==================================
 // ❤️ EFFETS DES LIKES
 // ==================================
 function onLikeEvent(event) {
   console.log("❤️ Like reçu :", event.count);
-  lightShakeBoost();
+  shakeTemporaryBoost(3, 700);
 }
 
 
-// ➕ AMPLIFICATION DE LA LUMIÈRE
-function radiusBoost(power) {
-  const oldRadius = tileSize * 1.4;
-  const boosted = oldRadius + (power * 10);
-  currentLightRadius = boosted;
-
+// ==================================
+// 🔆 BOOSTS GÉNÉRIQUES
+// ==================================
+function radiusTemporaryBoost(percent, duration) {
+  currentLightRadius = baseLightRadius + percent;
   setTimeout(() => {
-    currentLightRadius = oldRadius;
-  }, 1500);
+    currentLightRadius = baseLightRadius;
+  }, duration);
 }
 
-// ➕ BOOST TREMBLEMENT
-function lightShakeBoost() {
-  shakeIntensity = 4;
+function shakeTemporaryBoost(level, duration) {
+  shakeIntensity = level;
   setTimeout(() => {
     shakeIntensity = 2;
-  }, 1000);
+  }, duration);
 }
 
-// ⚡ FLASH LUMINEUX
+
+// ==================================
+// ⚡ FLASH ÉCRAN
+// ==================================
 function flashScreen() {
   const flash = document.createElement("div");
   flash.style.position = "absolute";
