@@ -2,97 +2,71 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>🏁 Marble Race</title>
+  <title>InterArcade – Marble Race</title>
   <link rel="stylesheet" href="marble.css" />
 </head>
 <body>
-  <div class="marble-wrapper">
-    <!-- Bandeau haut : titres / scores -->
-    <header class="hud">
-      <div class="title">
-        <h1>🏁 Marble Race</h1>
-        <p>GIFTS vs LIKES</p>
-      </div>
-      <div class="scores">
-        <div class="score-block gifts">
-          <span class="label">🎁 Gifts</span>
-          <span id="gift-score" class="value">0</span>
-        </div>
-        <div class="score-block likes">
-          <span class="label">❤️ Likes</span>
-          <span id="like-score" class="value">0</span>
-        </div>
-      </div>
-    </header>
-
-    <!-- Plateau de course -->
-    <div class="track-board">
-      <svg id="marble-track" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
-        <!-- Fond bois -->
-        <defs>
-          <linearGradient id="woodGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#5a3a21" />
-            <stop offset="50%" stop-color="#7a4c24" />
-            <stop offset="100%" stop-color="#4a311c" />
-          </linearGradient>
-          <radialGradient id="neonGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="rgba(0,255,255,0.9)" />
-            <stop offset="40%" stop-color="rgba(0,255,255,0.6)" />
-            <stop offset="100%" stop-color="rgba(0,255,255,0)" />
-          </radialGradient>
-        </defs>
-
-        <!-- plateau -->
-        <rect x="40" y="40" width="720" height="520" rx="60" ry="60"
-              class="board"/>
-
-        <!-- lueur globale autour de la piste -->
-        <path id="track-glow" class="track-glow"
-          d="M120 520
-             C200 520 260 490 310 450
-             C360 410 380 370 430 340
-             C500 300 570 300 620 270
-             C670 240 700 210 710 170
-             C720 130 700 100 660 90
-             C620 80 580 90 540 110
-             C500 130 470 150 430 170
-             C380 195 340 210 300 215
-             C260 220 230 220 200 240
-             C170 260 150 290 150 330
-             C150 370 170 400 190 430
-             C210 460 220 480 220 520" />
-
-        <!-- PISTE PRINCIPALE (utilisée par marble.js) -->
-        <path id="track-path" class="track-path"
-          d="M120 520
-             C200 520 260 490 310 450
-             C360 410 380 370 430 340
-             C500 300 570 300 620 270
-             C670 240 700 210 710 170
-             C720 130 700 100 660 90
-             C620 80 580 90 540 110
-             C500 130 470 150 430 170
-             C380 195 340 210 300 215
-             C260 220 230 220 200 240
-             C170 260 150 290 150 330
-             C150 370 170 400 190 430
-             C210 460 220 480 220 520" />
-
-        <!-- Obstacles créés par JS -->
+  <div id="marble-container">
+    <!-- 🖼 Plateau (image en fond gérée dans le CSS) -->
+    <div id="track-overlay">
+      <!-- 🧭 Piste + billes + obstacles -->
+      <svg id="track-svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet">
+        <!-- PISTE (trait invisible, juste pour le JS) -->
+        <path
+          id="track-path"
+          d="
+            M 260 900
+            C 420 880 520 860 640 800
+            C 760 740 820 680 880 620
+            C 960 540 1080 500 1220 500
+            C 1400 500 1540 540 1660 620
+            C 1760 690 1800 760 1760 840
+            C 1700 960 1540 1020 1320 1020
+            C 1080 1020 900 980 720 920
+            C 560 870 460 840 360 830
+            C 280 820 240 820 220 820
+            C 210 780 210 740 220 700
+            C 240 620 280 580 340 540
+            C 420 490 500 470 620 460
+            C 500 430 420 400 360 360
+            C 280 310 240 260 220 210
+            C 210 180 210 150 220 120
+            C 260 120 320 130 380 150
+            C 520 190 640 240 760 300
+            C 900 370 1040 420 1180 430
+            C 1340 440 1480 420 1600 380
+            C 1700 340 1780 300 1840 260
+            C 1860 320 1870 380 1870 440
+            C 1870 540 1820 620 1720 700
+            C 1600 790 1440 860 1240 900
+            C 1040 940 860 950 700 940
+            C 540 930 420 910 260 900
+          "
+          fill="none"
+          stroke="transparent"
+          stroke-width="40"
+        />
+        <!-- Groupe d'obstacles : rempli par JS -->
         <g id="obstacles"></g>
 
         <!-- Billes -->
-        <circle id="ball-gift" class="ball ball-gift" r="12" cx="120" cy="520" />
-        <circle id="ball-like" class="ball ball-like" r="12" cx="120" cy="520" />
+        <circle id="ball-gift" r="18" class="ball ball-gift" />
+        <circle id="ball-like" r="18" class="ball ball-like" />
       </svg>
     </div>
 
-    <footer class="hint">
-      <p>🎁 Cadeaux = bille OR • ❤️ Likes = bille ROSE • Le premier à la fin gagne</p>
-    </footer>
+    <!-- Scores -->
+    <div id="hud">
+      <div class="score gifts">
+        🎁 Cadeaux : <span id="gift-score">0</span>
+      </div>
+      <div class="score likes">
+        ❤️ Likes : <span id="like-score">0</span>
+      </div>
+    </div>
   </div>
 
-  <!-- Socket.IO puis logique de course -->
+  <!-- Socket.IO + logique course -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="marble.js"></script>
 </body>

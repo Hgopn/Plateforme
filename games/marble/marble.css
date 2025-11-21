@@ -1,171 +1,103 @@
 /* =============================
    GLOBAL
 ============================= */
-* {
-  box-sizing: border-box;
-}
-
 body {
   margin: 0;
   padding: 0;
-  background: radial-gradient(circle at top, #101522 0, #05060a 50%, #000 100%);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-  color: #fff;
+  background: #050608;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
-}
-
-.marble-wrapper {
-  width: 100%;
-  max-width: 1100px;
-  padding: 20px 24px 32px;
+  height: 100vh;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  color: #fff;
 }
 
 /* =============================
-   HUD / SCORES
+   CONTAINER PRINCIPAL
 ============================= */
-.hud {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 12px;
+#marble-container {
+  position: relative;
+  width: 1280px;   /* ratio 16:9 */
+  height: 720px;
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
 }
 
-.title h1 {
-  margin: 0;
-  font-size: 28px;
-  letter-spacing: 1px;
-}
-
-.title p {
-  margin: 2px 0 0;
-  font-size: 13px;
-  opacity: 0.7;
-}
-
-.scores {
-  display: flex;
-  gap: 12px;
-}
-
-.score-block {
-  min-width: 120px;
-  padding: 6px 10px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.7);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.score-block .label {
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-.score-block .value {
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.score-block.gifts {
-  border-color: rgba(255, 215, 0, 0.6);
-}
-
-.score-block.likes {
-  border-color: rgba(255, 105, 180, 0.7);
+/* 🖼 image de la piste en fond */
+#track-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: url("assets/marble_track.png"); /* <-- adapte le chemin si besoin */
+  background-size: cover;
+  background-position: center;
 }
 
 /* =============================
-   PLATEAU / SVG
+   SVG PISTE + BILLES
 ============================= */
-.track-board {
-  margin-top: 6px;
-  padding: 16px 14px 18px;
-  border-radius: 18px;
-  background: radial-gradient(circle at top, #1e1c26, #050509 60%, #000 100%);
-  box-shadow:
-    0 0 25px rgba(0, 0, 0, 0.9),
-    0 0 40px rgba(0, 255, 255, 0.08);
-}
-
-#marble-track {
+#track-svg {
   width: 100%;
-  display: block;
+  height: 100%;
 }
 
-/* Plateau bois */
-.board {
-  fill: url(#woodGrad);
-  stroke: #2b190e;
-  stroke-width: 8;
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
-}
-
-/* Piste néon */
-.track-path {
-  fill: none;
-  stroke: #00f5ff;
-  stroke-width: 20;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 0 16px rgba(0, 255, 255, 0.9));
-}
-
-/* Lueur large autour de la piste */
-.track-glow {
-  fill: none;
-  stroke: rgba(0, 255, 255, 0.15);
-  stroke-width: 40;
-}
-
-/* Obstacles fixes */
+/* Obstacles (remplis par JS) */
 .obstacle {
-  fill: #ffea00;
-  stroke: #fff;
-  stroke-width: 2;
-  filter: drop-shadow(0 0 8px rgba(255, 240, 0, 0.9));
-  animation: obstaclePulse 1.4s ease-in-out infinite;
-}
-
-@keyframes obstaclePulse {
-  0%, 100% {
-    r: 9;
-    opacity: 0.8;
-  }
-  50% {
-    r: 12;
-    opacity: 1;
-  }
+  fill: #ffd700;
+  stroke: #ffea8a;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 10px #ffd700);
 }
 
 /* Billes */
 .ball {
-  stroke-width: 3;
-  stroke: #ffffff;
-  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.9));
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.8));
 }
 
 .ball-gift {
-  fill: #ffd700;
-  filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.8));
+  fill: #ff3b8b; /* rose */
+  stroke: #ffffff;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 12px #ff3b8b);
 }
 
 .ball-like {
-  fill: #ff5cac;
-  filter: drop-shadow(0 0 10px rgba(255, 92, 172, 0.9));
+  fill: #00d4ff; /* bleu néon */
+  stroke: #ffffff;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 12px #00d4ff);
 }
 
 /* =============================
-   FOOTER / TEXTE
+   HUD SCORES
 ============================= */
-.hint {
-  margin-top: 8px;
-  text-align: center;
-  font-size: 13px;
-  opacity: 0.75;
+#hud {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 24px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.6);
+  font-size: 18px;
+}
+
+.score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.score.gifts span {
+  color: #ff3b8b;
+}
+
+.score.likes span {
+  color: #00d4ff;
 }
