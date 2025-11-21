@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>🏁 Course de Billes – InterArcade</title>
+  <link rel="stylesheet" href="marble.css" />
+</head>
+<body>
+
+  <h1 class="title">🏁 Course de Billes</h1>
+
+  <div class="scoreboard">
+    <div class="score like-score">❤️ Likes : <span id="likeCount">0</span></div>
+    <div class="score gift-score">🎁 Cadeaux : <span id="giftCount">0</span></div>
+  </div>
+
+  <div id="track">
+    <div id="marbleLikes" class="marble red"></div>
+    <div id="marbleGifts" class="marble blue"></div>
+    <div id="finishLine"></div>
+  </div>
+
+  <button id="startBtn">DÉMARRER LA COURSE</button>
+  <p id="winner"></p>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="marble.js"></script>
+</body>
+</html>

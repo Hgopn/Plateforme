@@ -43,13 +43,13 @@ def load_licenses():
 DEFAULT_LICENSES = {
     "IA-TEST-BASIC": {"games": ["slot"]},
     "IA-TEST-PRO": {"games": ["slot", "duel", "race", "plinko"]},
-    ("songmicon", "IA-SONGMI-PRO"): {"games": ["slot", "plinko", "race", "duel"]},
+    ("songmicon", "IA-SONGMI-PRO"): {"games": ["slot", "plinko", "race", "duel","marble"]},
 }
 
 # ============================================================
 # 🔹 MANIFEST JEUX
 # ============================================================
-GAMES_MANIFEST = {"games": ["slot","dark"]}
+GAMES_MANIFEST = {"games": ["slot","dark","marble"]}
 
 @app.route("/games/manifest.json")
 def games_manifest():
