@@ -2,33 +2,47 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>🌀 Marble Race – Neo Tube</title>
-  <link rel="stylesheet" href="marble.css" />
+  <title>Marble Race</title>
+  <link rel="stylesheet" href="Marble.css" />
+
+  <!-- Socket.IO -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
+
 <body>
-  <div class="marble-page">
-    <!-- HUD / TITRE -->
-    <div class="hud">
-      <div class="hud-title">INTERARCADE · MARBLE RACE</div>
-      <div class="hud-players">
-        <div class="hud-chip gifts">🎁 Gifts</div>
-        <div class="hud-chip likes">❤️ Likes</div>
-      </div>
-    </div>
 
-    <!-- TUBE FUTURISTE -->
-    <div class="canvas-wrapper">
-      <canvas id="marble-canvas" width="540" height="960"></canvas>
-    </div>
-
-    <!-- Légende (placeholder pour plus tard : scores, temps, etc.) -->
-    <div class="legend">
-      <span class="dot dot-gifts"></span> Bille Gifts · 
-      <span class="dot dot-likes"></span> Bille Likes
-    </div>
+<div id="scores">
+  <div class="score-block gifts">
+    🎁 Cadeaux : <span id="gift-score">0</span>
   </div>
+  <div class="score-block likes">
+    ❤️ Likes : <span id="like-score">0</span>
+  </div>
+</div>
 
-  <!-- (Plus tard on ajoutera Socket.IO ici pour les cadeaux TikTok) -->
-  <script src="marble.js"></script>
+<svg id="race-svg" viewBox="0 0 600 1800">
+
+  <!-- La piste -->
+  <path id="track-path"
+        d="M300 1750 
+           C 100 1500, 500 1300, 300 1100
+           S 500 700, 300 400
+           C 100 200, 100 50, 300 50"
+        fill="none"
+        stroke="#00ffff"
+        stroke-width="25"
+        stroke-linecap="round"
+        stroke-linejoin="round" />
+
+  <!-- Obstacles (ajoutés en JS) -->
+  <g id="obstacles"></g>
+
+  <!-- Billes -->
+  <circle id="ball-gift" cx="300" cy="1750" r="20" fill="#FFD700" />
+  <circle id="ball-like" cx="300" cy="1750" r="20" fill="#FF00FF" />
+
+</svg>
+
+<script src="Marble.js"></script>
 </body>
 </html>

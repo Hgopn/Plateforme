@@ -1,117 +1,43 @@
-/* =============================
-   GLOBAL
-============================= */
-* {
-  box-sizing: border-box;
-}
-
 body {
   margin: 0;
-  padding: 0;
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background:
-    radial-gradient(circle at 10% 20%, #3b0c59 0, #0b0517 40%, #050308 100%);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #f8f8ff;
-}
-
-/* PAGE */
-.marble-page {
+  background: #000;
+  color: white;
+  font-family: Arial, sans-serif;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 15px;
 }
 
-/* HUD */
-.hud {
-  text-align: center;
-}
-
-.hud-title {
-  font-size: 22px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  margin-bottom: 10px;
-  color: #f7f7ff;
-  text-shadow:
-    0 0 6px rgba(255, 255, 255, 0.7),
-    0 0 16px rgba(147, 112, 219, 0.9);
-}
-
-.hud-players {
+#scores {
   display: flex;
-  gap: 10px;
-  justify-content: center;
+  gap: 40px;
+  margin: 20px 0;
+  font-size: 26px;
+  text-shadow: 0 0 10px #fff;
 }
 
-.hud-chip {
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  backdrop-filter: blur(6px);
+.score-block {
+  padding: 10px 20px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
 }
 
-.hud-chip.gifts {
-  background: rgba(255, 105, 180, 0.13);
-  border-color: rgba(255, 105, 180, 0.6);
-}
+#gifts { color: #FFD700; }
+#likes { color: #FF00FF; }
 
-.hud-chip.likes {
-  background: rgba(0, 191, 255, 0.13);
-  border-color: rgba(0, 191, 255, 0.6);
+#race-svg {
+  width: 600px;
+  height: 900px;
+  border: 4px solid #00ffff;
+  border-radius: 20px;
+  box-shadow: 0 0 25px #00ffff;
+  background: url("wood_texture.jpg");
+  background-size: cover;
 }
-
-/* CANVAS / TUBE */
-.canvas-wrapper {
-  width: 540px;
-  height: 960px;
-  border-radius: 32px;
-  overflow: hidden;
-  position: relative;
-  box-shadow:
-    0 0 12px rgba(0, 0, 0, 0.8),
-    0 0 40px rgba(138, 43, 226, 0.8),
-    0 0 80px rgba(0, 255, 255, 0.5);
-  border: 2px solid rgba(255, 255, 255, 0.12);
-}
-
-/* Petit halo autour du tube */
-.canvas-wrapper::before {
-  content: "";
-  position: absolute;
-  inset: -40px;
-  background: radial-gradient(circle at 50% -10%, rgba(0, 255, 255, 0.15), transparent 70%);
-  pointer-events: none;
-}
-
-/* LÉGENDE */
-.legend {
-  margin-top: 8px;
-  font-size: 13px;
-  opacity: 0.8;
-}
-
-.dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  margin-right: 4px;
-}
-
-.dot-gifts {
-  background: #ff6bd5;
-  box-shadow: 0 0 8px #ff6bd5;
-}
-
-.dot-likes {
-  background: #00d4ff;
-  box-shadow: 0 0 8px #00d4ff;
+  
+.obstacle {
+  fill: #ff4444;
+  stroke: white;
+  stroke-width: 2;
 }
