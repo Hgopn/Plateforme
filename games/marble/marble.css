@@ -1,43 +1,171 @@
-body {
-  margin: 0;
-  background: #000;
-  color: white;
-  font-family: Arial, sans-serif;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+/* =============================
+   GLOBAL
+============================= */
+* {
+  box-sizing: border-box;
 }
 
-#scores {
+body {
+  margin: 0;
+  padding: 0;
+  background: radial-gradient(circle at top, #101522 0, #05060a 50%, #000 100%);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  color: #fff;
   display: flex;
-  gap: 40px;
-  margin: 20px 0;
-  font-size: 26px;
-  text-shadow: 0 0 10px #fff;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.marble-wrapper {
+  width: 100%;
+  max-width: 1100px;
+  padding: 20px 24px 32px;
+}
+
+/* =============================
+   HUD / SCORES
+============================= */
+.hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+
+.title h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 1px;
+}
+
+.title p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.scores {
+  display: flex;
+  gap: 12px;
 }
 
 .score-block {
-  padding: 10px 20px;
+  min-width: 120px;
+  padding: 6px 10px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
-#gifts { color: #FFD700; }
-#likes { color: #FF00FF; }
-
-#race-svg {
-  width: 600px;
-  height: 900px;
-  border: 4px solid #00ffff;
-  border-radius: 20px;
-  box-shadow: 0 0 25px #00ffff;
-  background: url("wood_texture.jpg");
-  background-size: cover;
+.score-block .label {
+  font-size: 12px;
+  opacity: 0.8;
 }
-  
+
+.score-block .value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.score-block.gifts {
+  border-color: rgba(255, 215, 0, 0.6);
+}
+
+.score-block.likes {
+  border-color: rgba(255, 105, 180, 0.7);
+}
+
+/* =============================
+   PLATEAU / SVG
+============================= */
+.track-board {
+  margin-top: 6px;
+  padding: 16px 14px 18px;
+  border-radius: 18px;
+  background: radial-gradient(circle at top, #1e1c26, #050509 60%, #000 100%);
+  box-shadow:
+    0 0 25px rgba(0, 0, 0, 0.9),
+    0 0 40px rgba(0, 255, 255, 0.08);
+}
+
+#marble-track {
+  width: 100%;
+  display: block;
+}
+
+/* Plateau bois */
+.board {
+  fill: url(#woodGrad);
+  stroke: #2b190e;
+  stroke-width: 8;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
+}
+
+/* Piste néon */
+.track-path {
+  fill: none;
+  stroke: #00f5ff;
+  stroke-width: 20;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 16px rgba(0, 255, 255, 0.9));
+}
+
+/* Lueur large autour de la piste */
+.track-glow {
+  fill: none;
+  stroke: rgba(0, 255, 255, 0.15);
+  stroke-width: 40;
+}
+
+/* Obstacles fixes */
 .obstacle {
-  fill: #ff4444;
-  stroke: white;
+  fill: #ffea00;
+  stroke: #fff;
   stroke-width: 2;
+  filter: drop-shadow(0 0 8px rgba(255, 240, 0, 0.9));
+  animation: obstaclePulse 1.4s ease-in-out infinite;
+}
+
+@keyframes obstaclePulse {
+  0%, 100% {
+    r: 9;
+    opacity: 0.8;
+  }
+  50% {
+    r: 12;
+    opacity: 1;
+  }
+}
+
+/* Billes */
+.ball {
+  stroke-width: 3;
+  stroke: #ffffff;
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.9));
+}
+
+.ball-gift {
+  fill: #ffd700;
+  filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.8));
+}
+
+.ball-like {
+  fill: #ff5cac;
+  filter: drop-shadow(0 0 10px rgba(255, 92, 172, 0.9));
+}
+
+/* =============================
+   FOOTER / TEXTE
+============================= */
+.hint {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.75;
 }
