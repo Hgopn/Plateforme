@@ -1,95 +1,117 @@
+/* =============================
+   GLOBAL
+============================= */
+* {
+  box-sizing: border-box;
+}
+
 body {
-  background: radial-gradient(circle at center, #0a0a1a, #000);
-  font-family: Arial, sans-serif;
-  color: white;
-  text-align: center;
   margin: 0;
-  padding-top: 20px;
-}
-
-.title {
-  font-size: 36px;
-  text-shadow: 0 0 20px #00eaff;
-}
-
-.scoreboard {
+  padding: 0;
+  min-height: 100vh;
   display: flex;
   justify-content: center;
-  gap: 50px;
-  margin-bottom: 20px;
+  align-items: center;
+  background:
+    radial-gradient(circle at 10% 20%, #3b0c59 0, #0b0517 40%, #050308 100%);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #f8f8ff;
+}
+
+/* PAGE */
+.marble-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+/* HUD */
+.hud {
+  text-align: center;
+}
+
+.hud-title {
   font-size: 22px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  color: #f7f7ff;
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.7),
+    0 0 16px rgba(147, 112, 219, 0.9);
 }
 
-.like-score {
-  color: #ff3b3b;
-  text-shadow: 0 0 10px #ff3b3b;
+.hud-players {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
 }
 
-.gift-score {
-  color: #009cff;
-  text-shadow: 0 0 10px #009cff;
+.hud-chip {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
 }
 
-#track {
-  position: relative;
-  width: 300px;
-  height: 500px;
-  margin: auto;
-  border: 3px solid #00eaff;
-  box-shadow: 0 0 25px #00eaff;
-  background: rgba(255, 255, 255, 0.05);
+.hud-chip.gifts {
+  background: rgba(255, 105, 180, 0.13);
+  border-color: rgba(255, 105, 180, 0.6);
+}
+
+.hud-chip.likes {
+  background: rgba(0, 191, 255, 0.13);
+  border-color: rgba(0, 191, 255, 0.6);
+}
+
+/* CANVAS / TUBE */
+.canvas-wrapper {
+  width: 540px;
+  height: 960px;
+  border-radius: 32px;
   overflow: hidden;
+  position: relative;
+  box-shadow:
+    0 0 12px rgba(0, 0, 0, 0.8),
+    0 0 40px rgba(138, 43, 226, 0.8),
+    0 0 80px rgba(0, 255, 255, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.12);
 }
 
-.marble {
+/* Petit halo autour du tube */
+.canvas-wrapper::before {
+  content: "";
   position: absolute;
-  width: 35px;
-  height: 35px;
-  border-radius: 50%;
-  top: 0px;
-  left: 40px;
-  box-shadow: 0 0 15px white;
+  inset: -40px;
+  background: radial-gradient(circle at 50% -10%, rgba(0, 255, 255, 0.15), transparent 70%);
+  pointer-events: none;
 }
 
-.red {
-  background: #ff3b3b;
-  box-shadow: 0 0 20px #ff3b3b;
+/* LÉGENDE */
+.legend {
+  margin-top: 8px;
+  font-size: 13px;
+  opacity: 0.8;
 }
 
-.blue {
-  background: #009cff;
-  left: 220px;
-  box-shadow: 0 0 20px #009cff;
-}
-
-#finishLine {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
+.dot {
+  display: inline-block;
+  width: 10px;
   height: 10px;
-  background: #ffd700;
-  box-shadow: 0 0 15px #ffd700;
+  border-radius: 999px;
+  margin-right: 4px;
 }
 
-#startBtn {
-  margin-top: 20px;
-  padding: 10px 30px;
-  font-size: 20px;
-  border: none;
-  background: #00eaff;
-  color: #000;
-  border-radius: 10px;
-  cursor: pointer;
-  box-shadow: 0 0 20px #00eaff;
-  transition: 0.2s;
+.dot-gifts {
+  background: #ff6bd5;
+  box-shadow: 0 0 8px #ff6bd5;
 }
 
-#startBtn:hover {
-  transform: scale(1.05);
-}
-
-#winner {
-  margin-top: 25px;
-  font-size: 26px;
-  text-shadow: 0 0 10px white;
+.dot-likes {
+  background: #00d4ff;
+  box-shadow: 0 0 8px #00d4ff;
 }

@@ -2,28 +2,33 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>🏁 Course de Billes – InterArcade</title>
+  <title>🌀 Marble Race – Neo Tube</title>
   <link rel="stylesheet" href="marble.css" />
 </head>
 <body>
+  <div class="marble-page">
+    <!-- HUD / TITRE -->
+    <div class="hud">
+      <div class="hud-title">INTERARCADE · MARBLE RACE</div>
+      <div class="hud-players">
+        <div class="hud-chip gifts">🎁 Gifts</div>
+        <div class="hud-chip likes">❤️ Likes</div>
+      </div>
+    </div>
 
-  <h1 class="title">🏁 Course de Billes</h1>
+    <!-- TUBE FUTURISTE -->
+    <div class="canvas-wrapper">
+      <canvas id="marble-canvas" width="540" height="960"></canvas>
+    </div>
 
-  <div class="scoreboard">
-    <div class="score like-score">❤️ Likes : <span id="likeCount">0</span></div>
-    <div class="score gift-score">🎁 Cadeaux : <span id="giftCount">0</span></div>
+    <!-- Légende (placeholder pour plus tard : scores, temps, etc.) -->
+    <div class="legend">
+      <span class="dot dot-gifts"></span> Bille Gifts · 
+      <span class="dot dot-likes"></span> Bille Likes
+    </div>
   </div>
 
-  <div id="track">
-    <div id="marbleLikes" class="marble red"></div>
-    <div id="marbleGifts" class="marble blue"></div>
-    <div id="finishLine"></div>
-  </div>
-
-  <button id="startBtn">DÉMARRER LA COURSE</button>
-  <p id="winner"></p>
-
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <!-- (Plus tard on ajoutera Socket.IO ici pour les cadeaux TikTok) -->
   <script src="marble.js"></script>
 </body>
 </html>
