@@ -7,10 +7,6 @@
     "games": ["slot", "duel", "race", "plinko"]
   },
 
-  "IA-SONGMI-PRO": {
-    "games": ["slot", "duel", "plinko", "race", "dark", "marble"]
-  },
-
   "songmicon": {
     "key": "IA-SONGMI-PRO",
     "games": ["slot", "duel", "plinko", "race", "dark", "marble"]
@@ -21,25 +17,14 @@
     "games": ["slot"]
   },
 
-  "IA-CRX-SLOT": {
-    "games": ["slot"]
-  },
-
   "creatorY": {
     "key": "IA-CRY-DUEL",
-    "games": ["duel", "plinko"]
-  },
-
-  "IA-CRY-DUEL": {
     "games": ["duel", "plinko"]
   },
 
   "jks_game": {
     "key": "IA-JKS-PRO",
     "games": ["slot", "duel", "plinko", "race"]
-  },
-
-  "IA-JKS-PRO": {
-    "games": ["slot", "duel", "plinko", "race"]
   }
 }
+
