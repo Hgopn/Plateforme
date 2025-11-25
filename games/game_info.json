@@ -1,19 +1,22 @@
 {
-  "slot": {
-    "title": "🎰 Machine Slot",
-    "description": "Tire la machine et marque un maximum de points !",
-    "image": "slot_card.png"
-  },
-
-  "dark": {
-    "title": "🌘 Dans le Noir",
-    "description": "Explore le labyrinthe et échappe aux pièges grâce aux cadeaux !",
-    "image": "dark_card.png"
-  },
-
-  "marble": {
-    "title": "🏁 Course de Billes",
-    "description": "Un duel automatique entre likes et cadeaux !",
-    "image": "marble_card.png"
-  }
+  "games": [
+    {
+      "id": "slot",
+      "title": "🎰 Machine Slot",
+      "description": "Tire la machine et marque un maximum de points !",
+      "image": "slot_card.png"
+    },
+    {
+      "id": "dark",
+      "title": "🌘 Dans le Noir",
+      "description": "Explore le labyrinthe et échappe aux pièges grâce aux cadeaux !",
+      "image": "dark_card.png"
+    },
+    {
+      "id": "marble",
+      "title": "🏁 Course de Billes",
+      "description": "Un duel automatique entre likes et cadeaux !",
+      "image": "marble_card.png"
+    }
+  ]
 }
