@@ -9,7 +9,7 @@
 
   "songmicon": {
     "key": "IA-SONGMI-PRO",
-    "games": ["slot", "duel", "plinko", "race", "dark", "marble"]
+    "games": ["slot", "duel", "plinko", "race", "dark", "marble","fight"]
   },
 
   "creatorX": {
