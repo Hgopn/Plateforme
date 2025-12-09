@@ -17,6 +17,12 @@
       "title": "🏁 Course de Billes",
       "description": "Un duel automatique entre likes et cadeaux !",
       "image": "marble_card.png"
+    },
+    {
+      "id": "fight",
+      "title": "Combat de clan",
+      "description": "Rejoignez une équipe et combattez en live !",
+      "image": "fight_card.png"
     }
   ]
 }
