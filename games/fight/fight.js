@@ -1,126 +1,103 @@
-// ======================================================
-// fight.js — Inter Fight Arena (V1)
-// Base : équipes + joueurs + commandes chat
-// ======================================================
+// ================================
+// Inter Fight Arena — fight.js
+// VERSION STABLE V1 (sans TikTok)
+// ================================
 
-// ===== CONFIG =====
-const MAX_HP = 100;
+console.log("⚔️ Inter Fight Arena prêt (V1)");
+console.log("👉 Tape testFight() dans la console pour tester");
 
-// ===== STATE =====
-const players = {}; // { username: { team, hp, el } }
-
+// -------------------------------
+// DATA
+// -------------------------------
 const teams = {
   left: {
-    hp: 1000,
-    container: document.getElementById("players-left"),
-    hpFill: document.getElementById("hp-left"),
+    hp: 100,
+    players: []
   },
   right: {
-    hp: 1000,
-    container: document.getElementById("players-right"),
-    hpFill: document.getElementById("hp-right"),
-  },
+    hp: 100,
+    players: []
+  }
 };
 
-// ======================================================
-// 🧍‍♂️ CRÉATION VISUELLE DU JOUEUR
-// ======================================================
-function createPlayerElement(username, team) {
-  const div = document.createElement("div");
-  div.className = "player";
+// -------------------------------
+// ELEMENTS (sécurisés)
+// -------------------------------
+const leftPlayersEl = document.getElementById("players-left");
+const rightPlayersEl = document.getElementById("players-right");
 
-  const name = document.createElement("div");
-  name.className = "player-name";
-  name.textContent = username;
+const hpLeftEl = document.getElementById("hp-left");
+const hpRightEl = document.getElementById("hp-right");
 
-  const body = document.createElement("div");
-  body.className = "player-body"; // futur stickman animé
-
-  div.appendChild(name);
-  div.appendChild(body);
-
-  return div;
+// -------------------------------
+// SAFE HELPERS
+// -------------------------------
+function safeStyle(el, prop, value) {
+  if (!el) return;
+  el.style[prop] = value;
 }
 
-// ======================================================
-// ➕ AJOUT DANS UNE ÉQUIPE
-// ======================================================
+// -------------------------------
+// UPDATE UI
+// -------------------------------
+function renderPlayers() {
+  if (leftPlayersEl) {
+    leftPlayersEl.innerHTML = "";
+    teams.left.players.forEach(p => {
+      const div = document.createElement("div");
+      div.className = "player";
+      div.textContent = p;
+      leftPlayersEl.appendChild(div);
+    });
+  }
+
+  if (rightPlayersEl) {
+    rightPlayersEl.innerHTML = "";
+    teams.right.players.forEach(p => {
+      const div = document.createElement("div");
+      div.className = "player";
+      div.textContent = p;
+      rightPlayersEl.appendChild(div);
+    });
+  }
+}
+
+function updateTeamHP() {
+  safeStyle(hpLeftEl, "width", teams.left.hp + "%");
+  safeStyle(hpRightEl, "width", teams.right.hp + "%");
+}
+
+// -------------------------------
+// GAME LOGIC
+// -------------------------------
 function joinTeam(username, team) {
-  if (players[username]) {
-    console.log(`⛔ ${username} est déjà dans une équipe`);
+  if (teams.left.players.includes(username) || teams.right.players.includes(username)) {
     return;
   }
 
-  if (!teams[team]) return;
-
-  const playerEl = createPlayerElement(username, team);
-  teams[team].container.appendChild(playerEl);
-
-  players[username] = {
-    team,
-    hp: MAX_HP,
-    el: playerEl,
-  };
-
+  teams[team].players.push(username);
   console.log(`✅ ${username} a rejoint l'équipe ${team}`);
+  renderPlayers();
 }
 
-// ======================================================
-// 💬 SIMULATION DES COMMENTAIRES (V1)
-// PLUS TARD → branché sur TikTokLive
-// ======================================================
-function handleChatCommand(username, message) {
-  const msg = message.toLowerCase().trim();
+function attack(fromTeam, damage = 10) {
+  const target = fromTeam === "left" ? "right" : "left";
+  teams[target].hp -= damage;
+  if (teams[target].hp < 0) teams[target].hp = 0;
 
-  if (msg === "!left") joinTeam(username, "left");
-  if (msg === "!right") joinTeam(username, "right");
+  console.log(`💥 Attaque ${fromTeam} → ${target} (-${damage} HP)`);
+  updateTeamHP();
 }
 
-// ======================================================
-// ⚔️ FUTURES MÉCANIQUES (PRÉPARÉES)
-// ======================================================
-function attack(attackerName, damage = 20) {
-  const attacker = players[attackerName];
-  if (!attacker) return;
+// -------------------------------
+// TEST MODE (LOCAL)
+// -------------------------------
+window.testFight = function () {
+  joinTeam("Alice", "left");
+  joinTeam("Bob", "right");
+  joinTeam("Charlie", "left");
+  joinTeam("David", "right");
 
-  const enemyTeam = attacker.team === "left" ? "right" : "left";
-  teams[enemyTeam].hp = Math.max(0, teams[enemyTeam].hp - damage);
-  updateTeamHP(enemyTeam);
-
-  console.log(`💥 ${attackerName} attaque ${enemyTeam} (-${damage})`);
-}
-
-function heal(username, amount = 15) {
-  const player = players[username];
-  if (!player) return;
-
-  player.hp = Math.min(MAX_HP, player.hp + amount);
-  console.log(`💚 ${username} se soigne (+${amount})`);
-}
-
-// ======================================================
-// ❤️ BARRES DE VIE
-// ======================================================
-function updateTeamHP(team) {
-  const percent = Math.max(0, teams[team].hp / 1000) * 100;
-  teams[team].hpFill.style.width = `${percent}%`;
-}
-
-// ======================================================
-// 🧪 MODE TEST LOCAL (TEMPORAIRE)
-// ======================================================
-window.testFight = () => {
-  handleChatCommand("Alice", "!left");
-  handleChatCommand("Bob", "!right");
-  handleChatCommand("Charlie", "!left");
-  handleChatCommand("David", "!right");
-
-  setTimeout(() => attack("Alice", 120), 1500);
-  setTimeout(() => attack("Bob", 80), 3000);
+  setTimeout(() => attack("left"), 500);
+  setTimeout(() => attack("right"), 1000);
 };
-
-// ======================================================
-// INIT
-// ======================================================
-console.log("⚔️ Inter Fight Arena prêt (V1)");
-console.log("👉 Tape testFight() dans la console pour tester");
