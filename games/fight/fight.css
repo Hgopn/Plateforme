@@ -1,0 +1,79 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: #fff;
+
+  /* 💥 Image de fond de l’arène */
+  background: url("arena_bg.png") center/cover no-repeat fixed;
+}
+
+/* ARENA */
+.arena {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100vh;
+  padding: 40px;
+  backdrop-filter: brightness(0.85); /* Légère obscurité pour lisibilité */
+}
+
+/* TEAMS */
+.team {
+  width: 35%;
+  background: rgba(0,0,0,0.45);
+  border-radius: 20px;
+  padding: 20px;
+}
+
+/* LEFT / RIGHT COLORS */
+.team-left {
+  border: 2px solid #3b82f6;
+}
+
+.team-right {
+  border: 2px solid #ef4444;
+}
+
+/* TITLES */
+.team h2 {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+/* PLAYERS */
+.players {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Placeholder players */
+.player {
+  width: 70px;
+  height: 70px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* CENTER */
+.arena-center {
+  width: 10%;
+  text-align: center;
+}
+
+.vs {
+  font-size: 48px;
+  font-weight: bold;
+  opacity: 0.9;
+  text-shadow: 0 0 10px #fff;
+}
