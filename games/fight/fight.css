@@ -8,72 +8,134 @@ body {
   color: #fff;
 
   /* 💥 Image de fond de l’arène */
-  background: url("arena_bg.png") center/cover no-repeat fixed;
+  background: url("arena_bg.png") center / cover no-repeat fixed;
+  overflow: hidden;
 }
 
-/* ARENA */
+/* =========================
+   ARENA
+========================= */
 .arena {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  position: relative;
+  width: 100vw;
   height: 100vh;
-  padding: 40px;
-  backdrop-filter: brightness(0.85); /* Légère obscurité pour lisibilité */
 }
 
-/* TEAMS */
+/* =========================
+   ZONES ÉQUIPES (invisibles)
+========================= */
 .team {
-  width: 35%;
-  background: rgba(0,0,0,0.45);
-  border-radius: 20px;
-  padding: 20px;
+  position: absolute;
+  bottom: 80px;
+  width: 40%;
+  min-height: 200px;
+
+  /* ❌ on enlève les cadres visuels */
+  background: none;
+  border: none;
+  padding: 0;
 }
 
-/* LEFT / RIGHT COLORS */
+/* ÉQUIPE GAUCHE */
 .team-left {
-  border: 2px solid #3b82f6;
+  left: 40px;
+  text-align: left;
 }
 
+/* ÉQUIPE DROITE */
 .team-right {
-  border: 2px solid #ef4444;
+  right: 40px;
+  text-align: right;
 }
 
-/* TITLES */
+/* TITRES (optionnels, discrets) */
 .team h2 {
-  text-align: center;
-  margin-bottom: 12px;
+  margin: 0 0 10px 0;
+  font-size: 20px;
+  opacity: 0.8;
 }
 
-/* PLAYERS */
+/* =========================
+   PLAYERS ZONE
+========================= */
 .players {
   display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
+  gap: 20px;
+  align-items: flex-end;
 }
 
-/* Placeholder players */
+/* orientation des équipes */
+.team-left .players {
+  justify-content: flex-start;
+}
+
+.team-right .players {
+  justify-content: flex-end;
+}
+
+/* =========================
+   STICKMAN
+========================= */
 .player {
-  width: 70px;
-  height: 70px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 12px;
+  position: relative;
+  width: 80px;
+  height: 120px;
+
+  /* ❌ plus de fond blanc / carré */
+  background: none;
+  border: none;
+
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  font-size: 12px;
-  border: 1px solid rgba(255,255,255,0.2);
 }
 
-/* CENTER */
+/* image stickman */
+.player img {
+  width: 80px;
+  height: auto;
+
+  /* ✅ transparence respectée */
+  background: none;
+
+  /* animation légère */
+  animation: idle 1.5s infinite ease-in-out;
+}
+
+/* orientation */
+.team-right .player img {
+  transform: scaleX(-1); /* regarde vers la gauche */
+}
+
+/* pseudo */
+.player-name {
+  margin-top: 6px;
+  font-size: 12px;
+  text-shadow: 0 0 6px rgba(0,0,0,0.8);
+  white-space: nowrap;
+}
+
+/* =========================
+   CENTER VS
+========================= */
 .arena-center {
-  width: 10%;
-  text-align: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .vs {
-  font-size: 48px;
+  font-size: 56px;
   font-weight: bold;
-  opacity: 0.9;
-  text-shadow: 0 0 10px #fff;
+  text-shadow: 0 0 15px rgba(255,255,255,0.8);
+}
+
+/* =========================
+   ANIMATIONS
+========================= */
+@keyframes idle {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
 }
