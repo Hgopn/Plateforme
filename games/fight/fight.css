@@ -11,7 +11,6 @@ body {
   color: #fff;
   overflow: hidden;
 
-  /* Image de fond arène */
   background: url("arena_bg.png") center bottom / cover no-repeat fixed;
 }
 
@@ -33,8 +32,8 @@ body {
 .team {
   width: 40%;
   position: relative;
-  background: none;
-  border: none;
+  background: none !important;
+  border: none !important;
   padding: 0;
 }
 
@@ -54,28 +53,30 @@ body {
 .players {
   position: relative;
   display: flex;
-  gap: 40px;
+  gap: 60px;
   justify-content: center;
   align-items: flex-end;
-  min-height: 420px;
+  min-height: 500px;
 }
 
 /* =========================
-   PLAYER (SPRITE)
+   PLAYER (RESET TOTAL)
 ========================= */
 .player {
-  all: unset;                 /* 🔥 RESET TOTAL */
+  all: unset;               /* 🔥 supprime TOUT héritage */
   display: flex;
   flex-direction: column;
   align-items: center;
-  pointer-events: none;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 /* =========================
    STICKMAN IMAGE
 ========================= */
 .player img {
-  width: 180px;               /* ✅ BEAUCOUP PLUS GRAND */
+  width: 220px;             /* ✅ VRAIMENT GRAND */
   height: auto;
   display: block;
 
@@ -83,16 +84,15 @@ body {
   border: none !important;
   box-shadow: none !important;
 
-  image-rendering: auto;
-  filter: drop-shadow(0 14px 18px rgba(0,0,0,0.75));
+  filter: drop-shadow(0 16px 22px rgba(0,0,0,0.8));
 }
 
 /* =========================
    PSEUDO
 ========================= */
 .player span {
-  margin-top: 6px;
-  font-size: 14px;
+  margin-top: 8px;
+  font-size: 15px;
   font-weight: 700;
   text-shadow: 0 2px 6px rgba(0,0,0,0.9);
 }
