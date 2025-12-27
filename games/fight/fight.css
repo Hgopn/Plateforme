@@ -2,13 +2,17 @@
   box-sizing: border-box;
 }
 
+/* =========================
+   BODY / ARENA BG
+========================= */
 body {
   margin: 0;
   font-family: system-ui, sans-serif;
   color: #fff;
+  overflow: hidden;
 
-  /* 💥 Image de fond de l’arène */
-  background: url("arena_bg.png") center / cover no-repeat fixed;
+  /* Image de fond arène */
+  background: url("arena_bg.png") center bottom / cover no-repeat fixed;
 }
 
 /* =========================
@@ -18,7 +22,7 @@ body {
   position: relative;
   display: flex;
   justify-content: space-between;
-  align-items: flex-end; /* ⬅️ important */
+  align-items: flex-end;
   height: 100vh;
   padding: 60px 80px;
 }
@@ -39,72 +43,62 @@ body {
 ========================= */
 .team h2 {
   text-align: center;
-  margin-bottom: 40px;
-  font-size: 24px;
-  text-shadow: 0 0 12px rgba(0,0,0,0.9);
+  margin-bottom: 20px;
+  font-size: 22px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.9);
 }
 
 /* =========================
-   PLAYERS CONTAINER
+   PLAYERS ZONE
 ========================= */
 .players {
   position: relative;
   display: flex;
   gap: 40px;
-  flex-wrap: wrap;
   justify-content: center;
   align-items: flex-end;
-
-  /* 🔥 POSITION SCÉNIQUE */
   min-height: 420px;
-  padding-bottom: 40px;
 }
 
 /* =========================
-   STICKMAN (PLAYER)
+   PLAYER (SPRITE)
 ========================= */
 .player {
-  width: auto;
-  height: auto;
-  background: none;
-  border: none;
-
+  all: unset;                 /* 🔥 RESET TOTAL */
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-
-  /* Légère perspective */
-  transform: translateY(0);
+  pointer-events: none;
 }
 
 /* =========================
-   IMAGE STICKMAN
+   STICKMAN IMAGE
 ========================= */
 .player img {
-  width: 160px;              /* ✅ BEAUCOUP PLUS GRAND */
+  width: 180px;               /* ✅ BEAUCOUP PLUS GRAND */
   height: auto;
-  background: transparent;
   display: block;
 
-  /* Effet scène */
-  filter: 
-    drop-shadow(0 18px 18px rgba(0,0,0,0.7))
-    drop-shadow(0 2px 0 rgba(0,0,0,0.6));
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+
+  image-rendering: auto;
+  filter: drop-shadow(0 14px 18px rgba(0,0,0,0.75));
 }
 
 /* =========================
    PSEUDO
 ========================= */
 .player span {
+  margin-top: 6px;
   font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.2px;
-  text-shadow: 0 0 8px rgba(0,0,0,0.9);
+  text-shadow: 0 2px 6px rgba(0,0,0,0.9);
 }
 
 /* =========================
-   ORIENTATION (FACE À FACE)
+   ORIENTATION
 ========================= */
 .team-left .player img {
   transform: scaleX(1);
@@ -115,7 +109,7 @@ body {
 }
 
 /* =========================
-   CENTER (VS)
+   CENTER VS
 ========================= */
 .arena-center {
   width: 10%;
@@ -126,6 +120,6 @@ body {
 .vs {
   font-size: 64px;
   font-weight: 900;
-  opacity: 0.95;
-  text-shadow: 0 0 24px rgba(255,255,255,0.9);
+  opacity: 0.9;
+  text-shadow: 0 0 20px #fff;
 }
