@@ -130,8 +130,28 @@ const LEVELS = [
 ];
 
 let map = LEVELS[0];
-let player = { x: 1, y: 1 };
+
+// ✅ MODIF: player a maintenant une direction
+let player = { x: 1, y: 1, dir: "down" };
+
 let tileSize = 50;
+
+
+// ==================================
+// ✅ MODIF: CHARGEMENT DES IMAGES (UNE SEULE FOIS)
+// Mets tes PNG ici : images/player_up.png etc.
+// ==================================
+const playerImages = {
+  up: new Image(),
+  down: new Image(),
+  left: new Image(),
+  right: new Image()
+};
+
+playerImages.up.src = "assets/player_up.png";
+playerImages.down.src = "assets/player_down.png";
+playerImages.left.src = "assets/player_left.png";
+playerImages.right.src = "assets/player_right.png";
 
 
 // ========================
@@ -172,6 +192,7 @@ function initPlayerFromSpawn() {
       if (map[y][x] === 3) {
         player.x = x;
         player.y = y;
+        // on garde la direction actuelle
         return;
       }
     }
@@ -196,12 +217,25 @@ document.getElementById("game-container").appendChild(canvas);
 
 const ctx = canvas.getContext("2d");
 
+// ✅ MODIF: drawPlayer dessine le PNG selon la direction
 function drawPlayer() {
   const px = player.x * tileSize;
   const py = player.y * tileSize;
 
-  ctx.fillStyle = "white";
-  ctx.fillRect(px + tileSize * 0.3, py + tileSize * 0.3, tileSize * 0.4, tileSize * 0.4);
+  const img = playerImages[player.dir];
+
+  // taille du perso (80% de la case) + centrage
+  const size = tileSize * 0.8;
+  const offset = (tileSize - size) / 2;
+
+  // fallback si image pas encore chargée → carré blanc (pour éviter bug visuel)
+  if (!img || !img.complete) {
+    ctx.fillStyle = "white";
+    ctx.fillRect(px + tileSize * 0.3, py + tileSize * 0.3, tileSize * 0.4, tileSize * 0.4);
+    return;
+  }
+
+  ctx.drawImage(img, px + offset, py + offset, size, size);
 }
 
 function drawLight() {
@@ -253,6 +287,12 @@ function nextLevel() {
 // 🎮 DÉPLACEMENT
 // ========================
 function move(dx, dy) {
+  // ✅ MODIF: on met à jour la direction AVANT de bouger
+  if (dx === 1) player.dir = "right";
+  if (dx === -1) player.dir = "left";
+  if (dy === 1) player.dir = "down";
+  if (dy === -1) player.dir = "up";
+
   const nx = player.x + dx;
   const ny = player.y + dy;
 
