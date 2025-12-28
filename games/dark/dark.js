@@ -131,15 +131,14 @@ const LEVELS = [
 
 let map = LEVELS[0];
 
-// ✅ MODIF: player a maintenant une direction
+// ✅ player avec direction
 let player = { x: 1, y: 1, dir: "down" };
 
 let tileSize = 50;
 
 
 // ==================================
-// ✅ MODIF: CHARGEMENT DES IMAGES (UNE SEULE FOIS)
-// Mets tes PNG ici : images/player_up.png etc.
+// ✅ CHARGEMENT DES IMAGES (assets)
 // ==================================
 const playerImages = {
   up: new Image(),
@@ -192,7 +191,6 @@ function initPlayerFromSpawn() {
       if (map[y][x] === 3) {
         player.x = x;
         player.y = y;
-        // on garde la direction actuelle
         return;
       }
     }
@@ -217,25 +215,24 @@ document.getElementById("game-container").appendChild(canvas);
 
 const ctx = canvas.getContext("2d");
 
-// ✅ MODIF: drawPlayer dessine le PNG selon la direction
+// ✅ FIX: plus de carré blanc (aucun fallback)
 function drawPlayer() {
+  const img = playerImages[player.dir];
+  if (!img || !img.complete) return; // on attend que l'image soit chargée
+
   const px = player.x * tileSize;
   const py = player.y * tileSize;
 
-  const img = playerImages[player.dir];
-
-  // taille du perso (80% de la case) + centrage
   const size = tileSize * 0.8;
   const offset = (tileSize - size) / 2;
 
-  // fallback si image pas encore chargée → carré blanc (pour éviter bug visuel)
-  if (!img || !img.complete) {
-    ctx.fillStyle = "white";
-    ctx.fillRect(px + tileSize * 0.3, py + tileSize * 0.3, tileSize * 0.4, tileSize * 0.4);
-    return;
-  }
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.imageSmoothingEnabled = true;
 
   ctx.drawImage(img, px + offset, py + offset, size, size);
+
+  ctx.restore();
 }
 
 function drawLight() {
@@ -258,6 +255,7 @@ function drawLight() {
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.fill();
 
+  // ✅ sécurité: on revient bien en source-over avant de dessiner le perso
   ctx.globalCompositeOperation = "source-over";
   drawPlayer();
 }
@@ -287,7 +285,7 @@ function nextLevel() {
 // 🎮 DÉPLACEMENT
 // ========================
 function move(dx, dy) {
-  // ✅ MODIF: on met à jour la direction AVANT de bouger
+  // ✅ direction AVANT de bouger
   if (dx === 1) player.dir = "right";
   if (dx === -1) player.dir = "left";
   if (dy === 1) player.dir = "down";
