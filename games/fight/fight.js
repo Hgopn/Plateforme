@@ -1,14 +1,14 @@
 // ================================
 // Inter Fight Arena — fight.js
-// VERSION STABLE V2 (stickmans visuels)
+// VERSION STABLE V3 (CSS-driven)
 // ================================
 
-console.log("⚔️ Inter Fight Arena prêt (V2 – stickmans)");
+console.log("⚔️ Inter Fight Arena prêt (V3)");
 
 // -------------------------------
 // CONFIG
 // -------------------------------
-const STICKMAN_IMG = "stickman.png"; // chemin relatif
+const STICKMAN_IMG = "./stickman.png";
 const MAX_HP = 100;
 
 // -------------------------------
@@ -35,70 +35,49 @@ const hpLeftEl = document.getElementById("hp-left");
 const hpRightEl = document.getElementById("hp-right");
 
 // -------------------------------
-// HELPERS
+// UI HELPERS
 // -------------------------------
-function safeStyle(el, prop, value) {
-  if (!el) return;
-  el.style[prop] = value;
+function updateTeamHP() {
+  if (hpLeftEl) hpLeftEl.style.width = teams.left.hp + "%";
+  if (hpRightEl) hpRightEl.style.width = teams.right.hp + "%";
 }
 
-function createStickman(username, team) {
+// -------------------------------
+// STICKMAN FACTORY (SANS STYLE)
+// -------------------------------
+function createStickman(username) {
   const wrapper = document.createElement("div");
   wrapper.className = "player";
   wrapper.dataset.user = username;
 
-  wrapper.style.display = "flex";
-  wrapper.style.flexDirection = "column";
-  wrapper.style.alignItems = "center";
-  wrapper.style.gap = "4px";
-
-  // pseudo
-  const name = document.createElement("div");
-  name.textContent = username;
-  name.style.fontSize = "11px";
-  name.style.opacity = "0.85";
-
-  // image
   const img = document.createElement("img");
   img.src = STICKMAN_IMG;
-  img.alt = "stickman";
-  img.style.width = "40px";
-  img.style.height = "40px";
-  img.style.objectFit = "contain";
+  img.alt = username;
+  img.draggable = false;
 
-  // couleur équipe
-  img.style.filter =
-    team === "left"
-      ? "drop-shadow(0 0 6px #3b82f6)"
-      : "drop-shadow(0 0 6px #ef4444)";
+  const name = document.createElement("span");
+  name.textContent = username;
 
-  wrapper.appendChild(name);
   wrapper.appendChild(img);
+  wrapper.appendChild(name);
 
   return wrapper;
 }
 
 // -------------------------------
-// UI UPDATE
+// RENDER
 // -------------------------------
 function renderPlayers() {
   if (leftPlayersEl) leftPlayersEl.innerHTML = "";
   if (rightPlayersEl) rightPlayersEl.innerHTML = "";
 
-  teams.left.players.forEach(p => {
-    const stickman = createStickman(p, "left");
-    leftPlayersEl.appendChild(stickman);
+  teams.left.players.forEach(username => {
+    leftPlayersEl.appendChild(createStickman(username));
   });
 
-  teams.right.players.forEach(p => {
-    const stickman = createStickman(p, "right");
-    rightPlayersEl.appendChild(stickman);
+  teams.right.players.forEach(username => {
+    rightPlayersEl.appendChild(createStickman(username));
   });
-}
-
-function updateTeamHP() {
-  safeStyle(hpLeftEl, "width", teams.left.hp + "%");
-  safeStyle(hpRightEl, "width", teams.right.hp + "%");
 }
 
 // -------------------------------
@@ -111,27 +90,24 @@ function joinTeam(username, team) {
     teams.left.players.includes(username) ||
     teams.right.players.includes(username)
   ) {
-    console.log(`⚠️ ${username} est déjà dans une équipe`);
+    console.log(`⚠️ ${username} déjà dans une équipe`);
     return;
   }
 
   teams[team].players.push(username);
-  console.log(`✅ ${username} rejoint l'équipe ${team.toUpperCase()}`);
+  console.log(`✅ ${username} rejoint ${team.toUpperCase()}`);
   renderPlayers();
 }
 
 function attack(fromTeam, damage = 10) {
   const target = fromTeam === "left" ? "right" : "left";
-
-  teams[target].hp -= damage;
-  if (teams[target].hp < 0) teams[target].hp = 0;
-
-  console.log(`💥 ${fromTeam} attaque ${target} (-${damage} HP)`);
+  teams[target].hp = Math.max(0, teams[target].hp - damage);
+  console.log(`💥 ${fromTeam} attaque ${target} (-${damage})`);
   updateTeamHP();
 }
 
 // -------------------------------
-// TEST MODE
+// TEST LOCAL
 // -------------------------------
 window.testFight = function () {
   joinTeam("Alice", "left");
