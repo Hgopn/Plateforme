@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     Object.entries(scores)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
+      .slice(0, 10)
       .forEach(([name, score]) => {
         const li = document.createElement("li");
         li.innerHTML = `<span>${name}</span><span>${score}</span>`;

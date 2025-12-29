@@ -92,3 +92,16 @@ body {
   margin-bottom: 6px;
   font-size: 0.95rem;
 }
+
+/* ======================================================
+   📱 AGRANDISSEMENT GLOBAL POUR TIKTOK LIVE
+   ====================================================== */
+.slot-container {
+  transform: scale(1.6);
+  transform-origin: center;
+}
+
+#leaderboard {
+  transform: scale(1.4);
+  transform-origin: top right;
+}
