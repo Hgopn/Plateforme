@@ -16,16 +16,16 @@ body {
 
 .reel {
   display: inline-block;
-  font-size: 4rem;
+  font-size: clamp(3.8rem, 7vw, 6.8rem);
   margin: 0 10px;
 }
 
 .btn {
   background: #00d4ff;
   border: none;
-  padding: 10px 20px;
+  padding: clamp(12px, 2.5vw, 20px) clamp(20px, 4vw, 36px);
   border-radius: 10px;
-  font-size: 1.1rem;
+  font-size: clamp(1.1rem, 2.8vw, 1.7rem);
   cursor: pointer;
   color: #000;
   margin-top: 20px;
@@ -43,9 +43,9 @@ body {
   background: rgba(0, 255, 200, 0.15);
   color: #00ffe7;
   font-family: 'Orbitron', sans-serif;
-  font-size: 1.4rem;
+  font-size: clamp(1.3rem, 3vw, 2.1rem);
   letter-spacing: 1px;
-  padding: 10px 22px;
+  padding: clamp(12px, 2.5vw, 20px) clamp(22px, 4vw, 38px);
   border: 2px solid rgba(0, 255, 200, 0.5);
   border-radius: 12px;
   box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
@@ -66,7 +66,7 @@ body {
   position: absolute;
   right: 30px;
   top: 120px;
-  width: 220px;
+  width: clamp(210px, 28vw, 360px);
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(0, 255, 255, 0.3);
   border-radius: 12px;
@@ -90,18 +90,5 @@ body {
   display: flex;
   justify-content: space-between;
   margin-bottom: 6px;
-  font-size: 0.95rem;
-}
-
-/* ======================================================
-   📱 AGRANDISSEMENT GLOBAL POUR TIKTOK LIVE
-   ====================================================== */
-.slot-container {
-  transform: scale(1.6);
-  transform-origin: center;
-}
-
-#leaderboard {
-  transform: scale(1.4);
-  transform-origin: top right;
+  font-size: clamp(0.95rem, 2.2vw, 1.25rem);
 }
