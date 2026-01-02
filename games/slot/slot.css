@@ -11,29 +11,29 @@ body {
    🎥 VIEWPORT — s’adapte à la fenêtre Electron
    ====================================================== */
 #viewport {
+  position: relative;
   width: 100%;
   height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
   background: #000;
+  overflow: hidden;
 }
 
 /* ======================================================
    🎬 SCÈNE FIXE — RÉFÉRENCE STREAM (1080×1920)
+   👉 CENTRÉE CORRECTEMENT
    ====================================================== */
 #scene {
   width: 1080px;
   height: 1920px;
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
   overflow: hidden;
 
   /* 👉 futur fond image */
   /* background: url("bg-slot.png") center / cover no-repeat; */
   background: radial-gradient(circle at center, #0d0d1a, #000);
-
-  /* ✅ AJOUT UNIQUE — nécessaire pour le scale JS */
-  transform-origin: top center;
 }
 
 /* ======================================================
@@ -99,7 +99,7 @@ body {
 }
 
 /* ======================================================
-   🏆 CLASSEMENT — POSITION FIXE
+   🏆 CLASSEMENT — POSITION FIXE DANS LA SCÈNE
    ====================================================== */
 #leaderboard {
   position: absolute;
@@ -131,16 +131,4 @@ body {
   justify-content: space-between;
   margin-bottom: 8px;
   font-size: 20px;
-}
-
-/* ======================================================
-   ✅ FIX VISUEL — SCALE TIKTOK
-   ====================================================== */
-
-#scene {
-  transform-origin: top left;
-}
-
-#viewport {
-  overflow: hidden;
 }
