@@ -8,36 +8,36 @@ body {
 }
 
 /* ======================================================
-   🎥 VIEWPORT — s’adapte à la fenêtre Electron
+   🎥 VIEWPORT — prend toute la fenêtre Electron
    ====================================================== */
 #viewport {
-  position: relative;
-  width: 100%;
+  width: 100vw;
   height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   background: #000;
-  overflow: hidden;
 }
 
 /* ======================================================
-   🎬 SCÈNE FIXE — RÉFÉRENCE STREAM (1080×1920)
-   👉 CENTRÉE CORRECTEMENT
+   🎬 SCÈNE TIKTOK — 1080 × 1920
+   👉 SCALED AUTOMATIQUEMENT
    ====================================================== */
 #scene {
   width: 1080px;
   height: 1920px;
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  overflow: hidden;
-
-  /* 👉 futur fond image */
-  /* background: url("bg-slot.png") center / cover no-repeat; */
+  position: relative;
   background: radial-gradient(circle at center, #0d0d1a, #000);
+
+  transform-origin: center center;
+  scale: min(
+    calc(100vw / 1080),
+    calc(100vh / 1920)
+  );
 }
 
 /* ======================================================
-   🎰 CONTENEUR SLOT — FIXE ET CENTRÉ
+   🎰 SLOT — CENTRÉ
    ====================================================== */
 .slot-container {
   position: absolute;
@@ -48,10 +48,9 @@ body {
 }
 
 /* ======================================================
-   🎰 ROULEAUX — TAILLES FIXES
+   🎰 ROULEAUX
    ====================================================== */
 .reel {
-  display: inline-block;
   font-size: 96px;
   margin: 0 16px;
 }
@@ -72,7 +71,7 @@ body {
 }
 
 /* ======================================================
-   🧩 BANNIÈRE JOUEUR (FIXE)
+   🧩 JOUEUR ACTUEL
    ====================================================== */
 #current-player {
   position: absolute;
@@ -83,52 +82,26 @@ body {
   color: #00ffe7;
   font-family: 'Orbitron', sans-serif;
   font-size: 32px;
-  letter-spacing: 1px;
   padding: 16px 36px;
   border: 2px solid rgba(0, 255, 200, 0.5);
   border-radius: 12px;
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
   opacity: 0;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  z-index: 10;
+  transition: 0.3s;
 }
 
 #current-player.show {
   opacity: 1;
-  transform: translateX(-50%) scale(1.05);
 }
 
 /* ======================================================
-   🏆 CLASSEMENT — POSITION FIXE DANS LA SCÈNE
+   🏆 CLASSEMENT
    ====================================================== */
 #leaderboard {
   position: absolute;
   right: 40px;
   top: 160px;
   width: 320px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(0, 255, 255, 0.3);
+  background: rgba(0,0,0,0.6);
   border-radius: 12px;
   padding: 14px;
-  font-family: 'Orbitron', sans-serif;
-}
-
-#leaderboard h3 {
-  margin: 0 0 12px;
-  text-align: center;
-  color: #00ffe7;
-  font-size: 22px;
-}
-
-#leaderboard-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-#leaderboard-list li {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 20px;
 }
