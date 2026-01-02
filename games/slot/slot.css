@@ -1,107 +1,94 @@
 body {
   margin: 0;
-  background: #000;
+  background: radial-gradient(circle at center, #0d0d1a, #000);
   color: white;
   font-family: 'Rajdhani', sans-serif;
-  height: 100vh;
-  overflow: hidden;
-}
-
-/* ======================================================
-   🎥 VIEWPORT — prend toute la fenêtre Electron
-   ====================================================== */
-#viewport {
-  width: 100vw;
-  height: 100vh;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  background: #000;
+  justify-content: center;
+  height: 100vh;
 }
 
-/* ======================================================
-   🎬 SCÈNE TIKTOK — 1080 × 1920
-   👉 SCALED AUTOMATIQUEMENT
-   ====================================================== */
-#scene {
-  width: 1080px;
-  height: 1920px;
-  position: relative;
-  background: radial-gradient(circle at center, #0d0d1a, #000);
-
-  transform-origin: center center;
-  scale: min(
-    calc(100vw / 1080),
-    calc(100vh / 1920)
-  );
-}
-
-/* ======================================================
-   🎰 SLOT — CENTRÉ
-   ====================================================== */
 .slot-container {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   text-align: center;
 }
 
-/* ======================================================
-   🎰 ROULEAUX
-   ====================================================== */
 .reel {
-  font-size: 96px;
-  margin: 0 16px;
+  display: inline-block;
+  font-size: clamp(3.8rem, 7vw, 6.8rem);
+  margin: 0 10px;
 }
 
-/* ======================================================
-   🔘 BOUTON
-   ====================================================== */
 .btn {
   background: #00d4ff;
   border: none;
-  padding: 18px 36px;
+  padding: clamp(12px, 2.5vw, 20px) clamp(20px, 4vw, 36px);
   border-radius: 10px;
-  font-size: 26px;
+  font-size: clamp(1.1rem, 2.8vw, 1.7rem);
   cursor: pointer;
   color: #000;
-  margin-top: 30px;
+  margin-top: 20px;
   font-weight: bold;
 }
 
 /* ======================================================
-   🧩 JOUEUR ACTUEL
+   🧩 Bannière du joueur en cours de spin
    ====================================================== */
 #current-player {
   position: absolute;
-  top: 40px;
+  top: 30px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(0, 255, 200, 0.15);
   color: #00ffe7;
   font-family: 'Orbitron', sans-serif;
-  font-size: 32px;
-  padding: 16px 36px;
+  font-size: clamp(1.3rem, 3vw, 2.1rem);
+  letter-spacing: 1px;
+  padding: clamp(12px, 2.5vw, 20px) clamp(22px, 4vw, 38px);
   border: 2px solid rgba(0, 255, 200, 0.5);
   border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
   opacity: 0;
-  transition: 0.3s;
+  transition: opacity 0.4s ease, transform 0.3s ease;
+  z-index: 999;
 }
 
 #current-player.show {
   opacity: 1;
+  transform: translateX(-50%) scale(1.05);
 }
 
 /* ======================================================
-   🏆 CLASSEMENT
+   🏆 Classement live
    ====================================================== */
 #leaderboard {
   position: absolute;
-  right: 40px;
-  top: 160px;
-  width: 320px;
-  background: rgba(0,0,0,0.6);
+  right: 30px;
+  top: 120px;
+  width: clamp(210px, 28vw, 360px);
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(0, 255, 255, 0.3);
   border-radius: 12px;
-  padding: 14px;
+  padding: 12px;
+  font-family: 'Orbitron', sans-serif;
+}
+
+#leaderboard h3 {
+  margin: 0 0 10px;
+  text-align: center;
+  color: #00ffe7;
+}
+
+#leaderboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#leaderboard-list li {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: clamp(0.95rem, 2.2vw, 1.25rem);
 }
