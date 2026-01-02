@@ -6,24 +6,40 @@
   <link rel="stylesheet" href="slot.css" />
 </head>
 <body>
-  <div class="slot-container">
-    <h1>🎰 Machine Slot</h1>
-    <p id="player">Chargement du joueur...</p>
-    <div class="slot-reels">
-      <div class="reel">🍒</div>
-      <div class="reel">💎</div>
-      <div class="reel">🔔</div>
+
+  <!-- ======================================================
+       🎥 VIEWPORT (s’adapte à la fenêtre Electron)
+       ====================================================== -->
+  <div id="viewport">
+
+    <!-- ======================================================
+         🎬 SCÈNE FIXE (référence stream TikTok)
+         ====================================================== -->
+    <div id="scene">
+
+      <div class="slot-container">
+        <h1>🎰 Machine Slot</h1>
+        <p id="player">Chargement du joueur...</p>
+
+        <div class="slot-reels">
+          <div class="reel">🍒</div>
+          <div class="reel">💎</div>
+          <div class="reel">🔔</div>
+        </div>
+
+        <button id="spin-btn" class="btn">Lancer 🎲</button>
+        <p id="result"></p>
+      </div>
+
+      <div id="current-player" class="player-banner"></div>
+
+      <!-- 🏆 Classement live -->
+      <div id="leaderboard">
+        <h3>🏆 Classement</h3>
+        <ul id="leaderboard-list"></ul>
+      </div>
+
     </div>
-    <button id="spin-btn" class="btn">Lancer 🎲</button>
-    <p id="result"></p>
-  </div>
-
-  <div id="current-player" class="player-banner"></div>
-
-  <!-- 🏆 Classement live -->
-  <div id="leaderboard">
-    <h3>🏆 Classement</h3>
-    <ul id="leaderboard-list"></ul>
   </div>
 
   <!-- ✅ Socket.IO avant slot.js -->

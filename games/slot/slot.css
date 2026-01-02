@@ -3,13 +3,40 @@ body {
   background: radial-gradient(circle at center, #0d0d1a, #000);
   color: white;
   font-family: 'Rajdhani', sans-serif;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   height: 100vh;
+  overflow: hidden;
 }
 
+/* ======================================================
+   🎥 VIEWPORT — s’adapte à la fenêtre Electron
+   ====================================================== */
+#viewport {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #000;
+}
+
+/* ======================================================
+   🎬 SCÈNE FIXE — RÉFÉRENCE STREAM (1080×1920)
+   ====================================================== */
+#scene {
+  width: 1080px;
+  height: 1920px;
+  position: relative;
+
+  /* 👉 futur fond image ici */
+  /* background: url("bg-slot.png") center / cover no-repeat; */
+
+  background: radial-gradient(circle at center, #0d0d1a, #000);
+  overflow: hidden;
+}
+
+/* ======================================================
+   🎰 CONTENU SLOT (INCHANGÉ)
+   ====================================================== */
 .slot-container {
   text-align: center;
 }
