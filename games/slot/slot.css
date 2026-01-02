@@ -31,6 +31,9 @@ body {
   /* 👉 futur fond image */
   /* background: url("bg-slot.png") center / cover no-repeat; */
   background: radial-gradient(circle at center, #0d0d1a, #000);
+
+  /* ✅ AJOUT UNIQUE — nécessaire pour le scale JS */
+  transform-origin: top center;
 }
 
 /* ======================================================

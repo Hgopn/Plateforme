@@ -45,8 +45,28 @@
     </div>
   </div>
 
+  <!-- ======================================================
+       ✅ SCALE AUTOMATIQUE — FORMAT TIKTOK (AJOUT UNIQUE)
+       ====================================================== -->
+  <script>
+    function scaleScene() {
+      const scene = document.getElementById("scene");
+      if (!scene) return;
+
+      const scaleX = window.innerWidth / 1080;
+      const scaleY = window.innerHeight / 1920;
+      const scale = Math.min(scaleX, scaleY);
+
+      scene.style.transform = `scale(${scale})`;
+    }
+
+    window.addEventListener("resize", scaleScene);
+    window.addEventListener("load", scaleScene);
+  </script>
+
   <!-- ✅ Scripts -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="slot.js"></script>
+
 </body>
 </html>
