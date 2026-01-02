@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0" />
   <title>🎰 Machine Slot</title>
   <link rel="stylesheet" href="slot.css" />
 </head>
@@ -17,6 +18,7 @@
          ====================================================== -->
     <div id="scene">
 
+      <!-- 🎰 SLOT -->
       <div class="slot-container">
         <h1>🎰 Machine Slot</h1>
         <p id="player">Chargement du joueur...</p>
@@ -31,9 +33,10 @@
         <p id="result"></p>
       </div>
 
+      <!-- 🧩 JOUEUR ACTUEL -->
       <div id="current-player" class="player-banner"></div>
 
-      <!-- 🏆 Classement live -->
+      <!-- 🏆 CLASSEMENT -->
       <div id="leaderboard">
         <h3>🏆 Classement</h3>
         <ul id="leaderboard-list"></ul>
@@ -42,7 +45,7 @@
     </div>
   </div>
 
-  <!-- ✅ Socket.IO avant slot.js -->
+  <!-- ✅ Scripts -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="slot.js"></script>
 </body>

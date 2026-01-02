@@ -1,6 +1,6 @@
 body {
   margin: 0;
-  background: radial-gradient(circle at center, #0d0d1a, #000);
+  background: #000;
   color: white;
   font-family: 'Rajdhani', sans-serif;
   height: 100vh;
@@ -26,59 +26,68 @@ body {
   width: 1080px;
   height: 1920px;
   position: relative;
-
-  /* 👉 futur fond image ici */
-  /* background: url("bg-slot.png") center / cover no-repeat; */
-
-  background: radial-gradient(circle at center, #0d0d1a, #000);
   overflow: hidden;
+
+  /* 👉 futur fond image */
+  /* background: url("bg-slot.png") center / cover no-repeat; */
+  background: radial-gradient(circle at center, #0d0d1a, #000);
 }
 
 /* ======================================================
-   🎰 CONTENU SLOT (INCHANGÉ)
+   🎰 CONTENEUR SLOT — FIXE ET CENTRÉ
    ====================================================== */
 .slot-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   text-align: center;
 }
 
+/* ======================================================
+   🎰 ROULEAUX — TAILLES FIXES
+   ====================================================== */
 .reel {
   display: inline-block;
-  font-size: clamp(3.8rem, 7vw, 6.8rem);
-  margin: 0 10px;
+  font-size: 96px;
+  margin: 0 16px;
 }
 
+/* ======================================================
+   🔘 BOUTON
+   ====================================================== */
 .btn {
   background: #00d4ff;
   border: none;
-  padding: clamp(12px, 2.5vw, 20px) clamp(20px, 4vw, 36px);
+  padding: 18px 36px;
   border-radius: 10px;
-  font-size: clamp(1.1rem, 2.8vw, 1.7rem);
+  font-size: 26px;
   cursor: pointer;
   color: #000;
-  margin-top: 20px;
+  margin-top: 30px;
   font-weight: bold;
 }
 
 /* ======================================================
-   🧩 Bannière du joueur en cours de spin
+   🧩 BANNIÈRE JOUEUR (FIXE)
    ====================================================== */
 #current-player {
   position: absolute;
-  top: 30px;
+  top: 40px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(0, 255, 200, 0.15);
   color: #00ffe7;
   font-family: 'Orbitron', sans-serif;
-  font-size: clamp(1.3rem, 3vw, 2.1rem);
+  font-size: 32px;
   letter-spacing: 1px;
-  padding: clamp(12px, 2.5vw, 20px) clamp(22px, 4vw, 38px);
+  padding: 16px 36px;
   border: 2px solid rgba(0, 255, 200, 0.5);
   border-radius: 12px;
   box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
   opacity: 0;
-  transition: opacity 0.4s ease, transform 0.3s ease;
-  z-index: 999;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 10;
 }
 
 #current-player.show {
@@ -87,24 +96,25 @@ body {
 }
 
 /* ======================================================
-   🏆 Classement live
+   🏆 CLASSEMENT — POSITION FIXE
    ====================================================== */
 #leaderboard {
   position: absolute;
-  right: 30px;
-  top: 120px;
-  width: clamp(210px, 28vw, 360px);
+  right: 40px;
+  top: 160px;
+  width: 320px;
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(0, 255, 255, 0.3);
   border-radius: 12px;
-  padding: 12px;
+  padding: 14px;
   font-family: 'Orbitron', sans-serif;
 }
 
 #leaderboard h3 {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   text-align: center;
   color: #00ffe7;
+  font-size: 22px;
 }
 
 #leaderboard-list {
@@ -116,16 +126,6 @@ body {
 #leaderboard-list li {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 6px;
-  font-size: clamp(0.95rem, 2.2vw, 1.25rem);
-}
-
-/* ======================================================
-   🎯 CENTRAGE DU CONTENU DANS LA SCÈNE (FIX)
-   ====================================================== */
-#scene {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  margin-bottom: 8px;
+  font-size: 20px;
 }
