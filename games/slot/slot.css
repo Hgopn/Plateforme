@@ -132,3 +132,15 @@ body {
   margin-bottom: 8px;
   font-size: 20px;
 }
+
+/* ======================================================
+   ✅ FIX VISUEL — SCALE TIKTOK
+   ====================================================== */
+
+#scene {
+  transform-origin: top left;
+}
+
+#viewport {
+  overflow: hidden;
+}
