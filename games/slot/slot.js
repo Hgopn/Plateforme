@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // === AFFICHAGE JOUEUR EN COURS ===
   function showCurrentPlayer(name) {
-    currentPlayerEl.textContent = `🎮 ${name}`;
+    currentPlayerEl.textContent = ` ${name}`;
     currentPlayerEl.classList.add("show");
 
     clearTimeout(showCurrentPlayer._timer);
