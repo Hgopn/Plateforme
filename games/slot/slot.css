@@ -8,6 +8,19 @@ body {
   align-items: center;
   justify-content: center;
   height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ======================================================
+   🎰 IMAGE DE FOND MACHINE (AJOUT UNIQUE)
+   ====================================================== */
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("machine.png") center / cover no-repeat;
+  z-index: -1;
 }
 
 /* ======================================================
@@ -15,7 +28,7 @@ body {
    ====================================================== */
 .slot-container {
   text-align: center;
-  transform: translateY(-40px); /* ⬅️ rouleaux un peu plus haut */
+  transform: translateY(-40px);
 }
 
 .reel {
@@ -41,7 +54,7 @@ body {
    ====================================================== */
 #current-player {
   position: absolute;
-  top: 70px; /* ⬅️ AVANT : 30px */
+  top: 70px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(0, 255, 200, 0.15);
@@ -68,7 +81,7 @@ body {
    ====================================================== */
 #leaderboard {
   position: absolute;
-  top: 70%;              /* ⬅️ sous la machine */
+  top: 70%;
   left: 50%;
   transform: translateX(-50%);
   width: clamp(210px, 28vw, 360px);
