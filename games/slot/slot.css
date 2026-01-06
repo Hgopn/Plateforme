@@ -1,6 +1,10 @@
 body {
   margin: 0;
-  background: radial-gradient(circle at center, #0d0d1a, #000);
+
+  /* ✅ AVANT : fond noir/violet
+     ❌ SUPPRIMÉ → maintenant TRANSPARENT */
+  background: transparent;
+
   color: white;
   font-family: 'Rajdhani', sans-serif;
   display: flex;
@@ -13,13 +17,17 @@ body {
 }
 
 /* ======================================================
-   🎰 IMAGE DE FOND MACHINE (AJOUT UNIQUE)
+   🎰 IMAGE DE FOND MACHINE (SEUL FOND VISIBLE)
    ====================================================== */
 body::before {
   content: "";
   position: absolute;
   inset: 0;
+
+  /* 👉 ton image de machine */
   background: url("machine.png") center / cover no-repeat;
+
+  /* IMPORTANT : derrière tout */
   z-index: -1;
 }
 
@@ -28,6 +36,10 @@ body::before {
    ====================================================== */
 .slot-container {
   text-align: center;
+
+  /* ✅ structure TRANSPARENTE (ne bloque pas l’image) */
+  background: transparent;
+
   transform: translateY(-40px);
 }
 
@@ -57,7 +69,7 @@ body::before {
   top: 70px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 255, 200, 0.15);
+  background: rgba(0, 255, 200, 0.15); /* volontairement semi-transparent */
   color: #00ffe7;
   font-family: 'Orbitron', sans-serif;
   font-size: clamp(1.3rem, 3vw, 2.1rem);
@@ -77,15 +89,19 @@ body::before {
 }
 
 /* ======================================================
-   🏆 Classement — placé SOUS les rouleaux
+   🏆 Classement — sous les rouleaux
    ====================================================== */
 #leaderboard {
   position: absolute;
   top: 70%;
   left: 50%;
   transform: translateX(-50%);
+
   width: clamp(210px, 28vw, 360px);
+
+  /* volontairement lisible mais pas opaque */
   background: rgba(0, 0, 0, 0.6);
+
   border: 1px solid rgba(0, 255, 255, 0.3);
   border-radius: 12px;
   padding: 12px;
