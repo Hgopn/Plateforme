@@ -19,6 +19,9 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
+
+  /* ✅ CORRECTION CRITIQUE — CENTRAGE RÉEL */
+  transform: translate(-50%, -50%);
   transform-origin: top left;
 }
 
@@ -38,7 +41,7 @@ body {
    ====================================================== */
 .slot-container {
   position: absolute;
-  top: 300px;           /* ⬅️ AJUSTABLE */
+  top: 300px;
   left: 50%;
   transform: translateX(-50%);
   text-align: center;
@@ -47,7 +50,7 @@ body {
 
 .reel {
   display: inline-block;
-  font-size: 96px;      /* ⬅️ FIXE */
+  font-size: 96px;
   margin: 0 12px;
 }
 
@@ -95,7 +98,7 @@ body {
    ====================================================== */
 #leaderboard {
   position: absolute;
-  top: 520px;          /* ⬅️ sous les rouleaux */
+  top: 520px;
   left: 50%;
   transform: translateX(-50%);
   width: 320px;
