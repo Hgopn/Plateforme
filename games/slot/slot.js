@@ -16,6 +16,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const currentPlayerEl = document.getElementById("current-player");
   const leaderboardList = document.getElementById("leaderboard-list");
 
+  // ======================================================
+  // 🆕 SCALE GLOBAL DU JEU (FIXE, TYPE JEU VIDÉO)
+  // ======================================================
+  const GAME_WIDTH = 1200;
+  const GAME_HEIGHT = 800;
+  const gameRoot = document.getElementById("game-root");
+
+  function applyGameScale() {
+    if (!gameRoot) return;
+
+    const scaleX = window.innerWidth / GAME_WIDTH;
+    const scaleY = window.innerHeight / GAME_HEIGHT;
+    const scale = Math.min(scaleX, scaleY);
+
+    gameRoot.style.transform = `scale(${scale})`;
+    gameRoot.style.transformOrigin = "top left";
+  }
+
+  applyGameScale();
+  window.addEventListener("resize", applyGameScale);
+  // ======================================================
+
   // --- Compatibilité Electron ---
   let ipcRenderer = null;
   try {
@@ -51,7 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // === AFFICHAGE JOUEUR EN COURS ===
   function showCurrentPlayer(name) {
-    currentPlayerEl.textContent = ` ${name}`;
+    currentPlayerEl.textContent = `${name}`;
     currentPlayerEl.classList.add("show");
 
     clearTimeout(showCurrentPlayer._timer);
@@ -142,7 +164,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // ======================================================
   // 🔗 Connexion Socket.IO vers ton serveur OVH (InterArcade)
   // ======================================================
-
   const urlParams = new URLSearchParams(window.location.search);
   const USERNAME = urlParams.get("username") || "songmicon";
   const SOCKET_URL = "http://51.38.238.227:5000";
@@ -159,7 +180,6 @@ document.addEventListener("DOMContentLoaded", () => {
         enqueueSpin(data);
       }
     });
-
   } catch (err) {
     console.error("❌ Erreur Socket.IO :", err);
   }
