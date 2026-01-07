@@ -1,11 +1,10 @@
-body {
-  background: red !important;
-}
 /* ======================================================
    🌑 BASE — FENÊTRE ÉLECTRON
    ====================================================== */
-body {
+html, body {
   margin: 0;
+  width: 100%;
+  height: 100%;
   background: transparent;
   color: white;
   font-family: 'Rajdhani', sans-serif;
@@ -13,33 +12,18 @@ body {
 }
 
 /* ======================================================
-   🎮 RACINE DU JEU (SCÈNE LOGIQUE FIXE)
-   - Taille de référence : 1200 × 800
-   - Tout le jeu SCALE d’un bloc
+   🎮 RACINE DU JEU
+   👉 La fenêtre Electron = la scène
    ====================================================== */
 #game-root {
-  width: 1200px;
-  height: 800px;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-
-  /* ✅ CENTRAGE + SCALE GLOBAL */
-  transform: translate(-50%, -50%) scale(var(--game-scale));
-  transform-origin: top left;
-}
-
-/* ======================================================
-   🔎 SCALE AUTOMATIQUE SELON LA FENÊTRE
-   ====================================================== */
-body {
-  --scale-x: calc(100vw / 1200);
-  --scale-y: calc(100vh / 800);
-  --game-scale: min(var(--scale-x), var(--scale-y));
+  width: 100%;
+  height: 100%;
+  position: relative;
 }
 
 /* ======================================================
    🎰 IMAGE DE FOND MACHINE
+   👉 TOUJOURS centrée, jamais coupée
    ====================================================== */
 #game-root::before {
   content: "";
@@ -50,23 +34,29 @@ body {
 }
 
 /* ======================================================
-   🎰 SLOT — POSITION FIXE DANS LA SCÈNE
+   🎰 SLOT — CENTRÉ DANS LA FENÊTRE
    ====================================================== */
 .slot-container {
   position: absolute;
-  top: 300px;
+  top: 42%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   text-align: center;
   background: transparent;
 }
 
+/* ======================================================
+   🎰 ROULEAUX
+   ====================================================== */
 .reel {
   display: inline-block;
   font-size: 96px;
   margin: 0 12px;
 }
 
+/* ======================================================
+   🔘 BOUTON
+   ====================================================== */
 .btn {
   background: #00d4ff;
   border: none;
@@ -84,7 +74,7 @@ body {
    ====================================================== */
 #current-player {
   position: absolute;
-  top: 80px;
+  top: 70px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(0, 255, 200, 0.15);
@@ -107,11 +97,11 @@ body {
 }
 
 /* ======================================================
-   🏆 CLASSEMENT
+   🏆 CLASSEMENT — SOUS LA MACHINE
    ====================================================== */
 #leaderboard {
   position: absolute;
-  top: 520px;
+  top: 62%;
   left: 50%;
   transform: translateX(-50%);
   width: 320px;
