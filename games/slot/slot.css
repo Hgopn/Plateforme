@@ -42,7 +42,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: url("machine.png") center / contain no-repeat;
+  background: url("machine.png") center bottom / contain no-repeat;
   z-index: -1;
 }
 
