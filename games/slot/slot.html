@@ -8,13 +8,12 @@
 <body>
 
   <!-- ======================================================
-       🎮 RACINE JEU (NOUVEAU – OBLIGATOIRE POUR LE SCALE)
+       🎮 RACINE JEU (OBLIGATOIRE POUR LE SCALE)
        ====================================================== -->
   <div id="game-root">
 
+    <!-- 🎰 MACHINE SLOT -->
     <div class="slot-container">
-      <h1>Machine Slot</h1>
-      <p id="player"></p>
 
       <div class="slot-reels">
         <div class="reel">🍒</div>
@@ -26,9 +25,10 @@
       <p id="result"></p>
     </div>
 
+    <!-- 🧩 JOUEUR ACTUEL -->
     <div id="current-player" class="player-banner"></div>
 
-    <!-- 🏆 Classement live -->
+    <!-- 🏆 CLASSEMENT LIVE -->
     <div id="leaderboard">
       <h3>Classement</h3>
       <ul id="leaderboard-list"></ul>
@@ -36,7 +36,7 @@
 
   </div>
 
-  <!-- ✅ Socket.IO avant slot.js -->
+  <!-- ✅ Scripts -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="slot.js"></script>
 </body>

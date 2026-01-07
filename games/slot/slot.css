@@ -10,8 +10,9 @@ body {
 }
 
 /* ======================================================
-   🎮 RACINE DU JEU (ZONE LOGIQUE FIXE)
-   ⚠️ NE JAMAIS UTILISER vh / vw ICI
+   🎮 RACINE DU JEU (SCÈNE LOGIQUE FIXE)
+   - Taille de référence : 1200 × 800
+   - Tout le jeu SCALE d’un bloc
    ====================================================== */
 #game-root {
   width: 1200px;
@@ -20,9 +21,18 @@ body {
   top: 50%;
   left: 50%;
 
-  /* ✅ CORRECTION CRITIQUE — CENTRAGE RÉEL */
-  transform: translate(-50%, -50%);
+  /* ✅ CENTRAGE + SCALE GLOBAL */
+  transform: translate(-50%, -50%) scale(var(--game-scale));
   transform-origin: top left;
+}
+
+/* ======================================================
+   🔎 SCALE AUTOMATIQUE SELON LA FENÊTRE
+   ====================================================== */
+body {
+  --scale-x: calc(100vw / 1200);
+  --scale-y: calc(100vh / 800);
+  --game-scale: min(var(--scale-x), var(--scale-y));
 }
 
 /* ======================================================
@@ -37,7 +47,7 @@ body {
 }
 
 /* ======================================================
-   🎰 SLOT — POSITION FIXE
+   🎰 SLOT — POSITION FIXE DANS LA SCÈNE
    ====================================================== */
 .slot-container {
   position: absolute;
