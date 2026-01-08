@@ -12,28 +12,34 @@
        ====================================================== -->
   <div id="game-root">
 
-    <!-- 🎰 MACHINE SLOT -->
-    <div class="slot-container">
+    <!-- ======================================================
+         🎮 CONTENEUR SCALÉ (AJOUT UNIQUE)
+         ====================================================== -->
+    <div id="game-scale">
 
-      <div class="slot-reels">
-        <div class="reel">🍒</div>
-        <div class="reel">💎</div>
-        <div class="reel">🔔</div>
+      <!-- 🎰 MACHINE SLOT -->
+      <div class="slot-container">
+
+        <div class="slot-reels">
+          <div class="reel">🍒</div>
+          <div class="reel">💎</div>
+          <div class="reel">🔔</div>
+        </div>
+
+        <button id="spin-btn" class="btn">Lancer 🎲</button>
+        <p id="result"></p>
       </div>
 
-      <button id="spin-btn" class="btn">Lancer 🎲</button>
-      <p id="result"></p>
+      <!-- 🧩 JOUEUR ACTUEL -->
+      <div id="current-player" class="player-banner"></div>
+
+      <!-- 🏆 CLASSEMENT LIVE -->
+      <div id="leaderboard">
+        <h3>Classement</h3>
+        <ul id="leaderboard-list"></ul>
+      </div>
+
     </div>
-
-    <!-- 🧩 JOUEUR ACTUEL -->
-    <div id="current-player" class="player-banner"></div>
-
-    <!-- 🏆 CLASSEMENT LIVE -->
-    <div id="leaderboard">
-      <h3>Classement</h3>
-      <ul id="leaderboard-list"></ul>
-    </div>
-
   </div>
 
   <!-- ✅ Scripts -->
