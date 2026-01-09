@@ -2,43 +2,31 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Machine Slot</title>
+  <title>🎰 Machine Slot</title>
   <link rel="stylesheet" href="slot.css" />
 </head>
 <body>
-
-  <!-- 🎮 RACINE DU JEU -->
-  <div id="game-root">
-
-    <!-- 🎮 CONTENEUR SCALÉ (OBLIGATOIRE) -->
-    <div id="game-scale">
-
-      <!-- 🎰 MACHINE SLOT -->
-      <div class="slot-container">
-
-        <div class="slot-reels">
-          <div class="reel">🍒</div>
-          <div class="reel">💎</div>
-          <div class="reel">🔔</div>
-        </div>
-
-        <button id="spin-btn" class="btn">Lancer 🎲</button>
-        <p id="result"></p>
-      </div>
-
-      <!-- 🧩 JOUEUR ACTUEL -->
-      <div id="current-player" class="player-banner"></div>
-
-      <!-- 🏆 CLASSEMENT LIVE -->
-      <div id="leaderboard">
-        <h3>Classement</h3>
-        <ul id="leaderboard-list"></ul>
-      </div>
-
+  <div class="slot-container">
+    <h1>🎰 Machine Slot</h1>
+    <p id="player">Chargement du joueur...</p>
+    <div class="slot-reels">
+      <div class="reel">🍒</div>
+      <div class="reel">💎</div>
+      <div class="reel">🔔</div>
     </div>
+    <button id="spin-btn" class="btn">Lancer 🎲</button>
+    <p id="result"></p>
   </div>
 
-  <!-- ✅ Scripts -->
+  <div id="current-player" class="player-banner"></div>
+
+  <!-- 🏆 Classement live -->
+  <div id="leaderboard">
+    <h3>🏆 Classement</h3>
+    <ul id="leaderboard-list"></ul>
+  </div>
+
+  <!-- ✅ Socket.IO avant slot.js -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="slot.js"></script>
 </body>
