@@ -2,71 +2,26 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0" />
   <title>🎰 Machine Slot</title>
   <link rel="stylesheet" href="slot.css" />
 </head>
 <body>
-
-  <!-- ======================================================
-       🎥 VIEWPORT (s’adapte à la fenêtre Electron)
-       ====================================================== -->
-  <div id="viewport">
-
-    <!-- ======================================================
-         🎬 SCÈNE FIXE (référence stream TikTok)
-         ====================================================== -->
-    <div id="scene">
-
-      <!-- 🎰 SLOT -->
-      <div class="slot-container">
-        <h1>🎰 Machine Slot</h1>
-        <p id="player">Chargement du joueur...</p>
-
-        <div class="slot-reels">
-          <div class="reel">🍒</div>
-          <div class="reel">💎</div>
-          <div class="reel">🔔</div>
-        </div>
-
-        <button id="spin-btn" class="btn">Lancer 🎲</button>
-        <p id="result"></p>
-      </div>
-
-      <!-- 🧩 JOUEUR ACTUEL -->
-      <div id="current-player" class="player-banner"></div>
-
-      <!-- 🏆 CLASSEMENT -->
-      <div id="leaderboard">
-        <h3>🏆 Classement</h3>
-        <ul id="leaderboard-list"></ul>
-      </div>
-
+  <div class="slot-container">
+    <h1>🎰 Machine Slot</h1>
+    <p id="player">Chargement du joueur...</p>
+    <div class="slot-reels">
+      <div class="reel">🍒</div>
+      <div class="reel">💎</div>
+      <div class="reel">🔔</div>
     </div>
+    <button id="spin-btn" class="btn">Lancer 🎲</button>
+    <p id="result"></p>
   </div>
 
-  <!-- ======================================================
-       ✅ SCALE AUTOMATIQUE — FORMAT TIKTOK (AJOUT UNIQUE)
-       ====================================================== -->
-  <script>
-    function scaleScene() {
-      const scene = document.getElementById("scene");
-      if (!scene) return;
+  <div id="current-player" class="player-banner"></div>
 
-      const scaleX = window.innerWidth / 1080;
-      const scaleY = window.innerHeight / 1920;
-      const scale = Math.min(scaleX, scaleY);
-
-      scene.style.transform = `scale(${scale})`;
-    }
-
-    window.addEventListener("resize", scaleScene);
-    window.addEventListener("load", scaleScene);
-  </script>
-
-  <!-- ✅ Scripts -->
+  <!-- ✅ Socket.IO avant slot.js -->
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="slot.js"></script>
-
 </body>
 </html>
