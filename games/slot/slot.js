@@ -91,7 +91,11 @@ document.addEventListener("DOMContentLoaded", () => {
       .slice(0, 10)
       .forEach(([name, score]) => {
         const li = document.createElement("li");
-        li.innerHTML = `<span>${name}</span><span>${score}</span>`;
+        const nameEl = document.createElement("span");
+        const scoreEl = document.createElement("span");
+        nameEl.textContent = name;
+        scoreEl.textContent = score;
+        li.append(nameEl, scoreEl);
         leaderboardList.appendChild(li);
       });
   }
@@ -166,18 +170,19 @@ document.addEventListener("DOMContentLoaded", () => {
   // ======================================================
   const urlParams = new URLSearchParams(window.location.search);
   const USERNAME = urlParams.get("username") || "songmicon";
-  const SOCKET_URL = "http://51.38.238.227:5000";
+  const SOCKET_URL = window.location.origin;
 
   let socket = null;
   try {
     socket = io(SOCKET_URL, {
       transports: ["websocket"],
-      query: { username: USERNAME }
+      auth: { token: urlParams.get("token") || "" }
     });
 
     socket.on("ia:event", (data) => {
-      if (data && data.type === "gift") {
-        enqueueSpin(data);
+      const event = data?.payload || data;
+      if (event && data.type === "gift") {
+        enqueueSpin({ ...event, from: data.actor || event.from });
       }
     });
   } catch (err) {

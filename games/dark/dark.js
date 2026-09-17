@@ -21,7 +21,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const USERNAME = urlParams.get("username") || "songmicon";
 
 // Backend OVH
-const SOCKET_URL = "http://51.38.238.227:5000";
+const SOCKET_URL = window.location.origin;
 
 // Connexion Socket.IO
 try {
@@ -29,7 +29,7 @@ try {
 
   socket = io(SOCKET_URL, {
     transports: ["websocket"],
-    query: { username: USERNAME }
+    auth: { token: urlParams.get("token") || "" }
   });
 
   socket.on("connect", () => {
@@ -44,8 +44,9 @@ try {
   socket.on("ia:event", (data) => {
     console.log("📩 [DARK] Event reçu :", data);
 
-    if (data && data.type === "gift") onGiftEvent(data);
-    if (data && data.type === "like") onLikeEvent(data);
+    const event = data?.payload || data;
+    if (data && data.type === "gift") onGiftEvent(event);
+    if (data && data.type === "like") onLikeEvent(event);
   });
 
 } catch (err) {

@@ -24,8 +24,9 @@ TikTokLive==6.6.1
 typing_extensions==4.15.0
 websockets==15.0.1
 websockets_proxy==0.1.3
-flask
-flask-socketio
-flask-cors
-eventlet
-websocket-client
+Flask==3.0.3
+Flask-SocketIO==5.3.6
+Flask-Cors==4.0.1
+python-socketio==5.14.1
+websocket-client==1.9.0
+python-dotenv==1.0.1

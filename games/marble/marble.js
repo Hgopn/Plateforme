@@ -14,7 +14,7 @@ try {
 
 // username
 const USERNAME = new URLSearchParams(window.location.search).get("username") || "songmicon";
-const SOCKET_URL = "http://51.38.238.227:5000";
+const SOCKET_URL = window.location.origin;
 
 // scores
 let giftScore = 0;
@@ -69,13 +69,14 @@ function connectSocket() {
   try {
     socket = io(SOCKET_URL, {
       transports: ["websocket"],
-      query: { username: USERNAME }
+      auth: { token: new URLSearchParams(window.location.search).get("token") || "" }
     });
 
     socket.on("ia:event", data => {
       if (!data || (data.target && data.target !== USERNAME)) return;
-      if (data.type === "gift") handleGiftEvent(data);
-      if (data.type === "like") handleLikeEvent(data);
+      const event = data.payload || data;
+      if (data.type === "gift") handleGiftEvent(event);
+      if (data.type === "like") handleLikeEvent(event);
     });
 
   } catch (err) {
