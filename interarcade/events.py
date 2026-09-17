@@ -47,11 +47,12 @@ class InterArcadeEvent:
         }
 
 
-def event_from_tiktok(tenant_id: str, session_id: str, event_type: str, actor: str, **payload):
+def event_from_tiktok(tenant_id: str, session_id: str, event_type: str, actor: str, event_id: str | None = None, **payload):
     return InterArcadeEvent(
         tenant_id=tenant_id,
         session_id=session_id,
         type=event_type,
         actor=actor,
         payload=payload,
+        event_id=event_id or str(uuid4()),
     )

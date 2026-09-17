@@ -13,6 +13,8 @@ class TestConfig(Config):
     ADMIN_TOKEN = "test-admin"
     INTERNAL_EVENT_TOKEN = "test-internal"
     ALLOWED_ORIGINS = "http://localhost:5000"
+    DATABASE_URL = "sqlite:////tmp/interarcade-foundation-test.sqlite"
+    REQUIRE_WORKER_HEARTBEAT = False
 
 
 class FoundationTests(unittest.TestCase):
@@ -56,6 +58,45 @@ class FoundationTests(unittest.TestCase):
             },
         )
         self.assertEqual(response.status_code, 202)
+
+        malformed = client.post(
+            "/api/v1/internal/events",
+            headers={"X-InterArcade-Internal-Token": "test-internal"},
+            json={"tenant_id": "songmicon", "session_id": "session", "type": "gift", "actor": "viewer", "payload": []},
+        )
+        self.assertEqual(malformed.status_code, 400)
+
+        unsupported = client.post(
+            "/api/v1/internal/events",
+            headers={"X-InterArcade-Internal-Token": "test-internal"},
+            json={"schema_version": 99, "tenant_id": "songmicon", "session_id": "session", "type": "gift", "actor": "viewer"},
+        )
+        self.assertEqual(unsupported.status_code, 400)
+
+    def test_session_and_detailed_health(self):
+        app = create_app(TestConfig)
+        client = app.test_client()
+        response = client.post(
+            "/api/v1/sessions",
+            json={"tenant_id": "songmicon", "username": "songmicon", "game_id": "fight", "license_key": "IA-SONGMI-PRO"},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertIn("token", response.get_json())
+        health = client.get("/health")
+        self.assertEqual(health.status_code, 200)
+        self.assertEqual(health.get_json()["checks"]["database"], True)
+        started = client.post(
+            "/api/v1/listeners/start",
+            headers={"Authorization": "Bearer test-admin"},
+            json={"tenant_id": "songmicon", "username": "songmicon", "session_id": response.get_json()["session_id"]},
+        )
+        self.assertEqual(started.status_code, 202)
+        stopped = client.post(
+            "/api/v1/listeners/stop",
+            headers={"Authorization": "Bearer test-admin"},
+            json={"tenant_id": "songmicon"},
+        )
+        self.assertEqual(stopped.status_code, 202)
 
     def test_socket_requires_signed_session(self):
         app = create_app(TestConfig)

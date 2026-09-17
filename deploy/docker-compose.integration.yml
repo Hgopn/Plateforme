@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:17.11-alpine3.24
+    container_name: interarcade-v2-postgres
+    environment:
+      POSTGRES_DB: interarcade
+      POSTGRES_USER: interarcade
+      POSTGRES_PASSWORD: ${INTERARCADE_DB_PASSWORD}
+    volumes:
+      - interarcade-v2-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U interarcade -d interarcade"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile.integration
+    container_name: interarcade-v2-api
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgresql://interarcade:${INTERARCADE_DB_PASSWORD}@postgres:5432/interarcade
+      INTERARCADE_API_URL: http://api:5000
+      HOST: 0.0.0.0
+      INTERARCADE_SECRET_KEY: ${INTERARCADE_SECRET_KEY}
+      INTERARCADE_SESSION_SECRET: ${INTERARCADE_SESSION_SECRET}
+      INTERARCADE_ADMIN_TOKEN: ${INTERARCADE_ADMIN_TOKEN}
+      INTERARCADE_INTERNAL_EVENT_TOKEN: ${INTERARCADE_INTERNAL_EVENT_TOKEN}
+      INTERARCADE_OBSERVER_TOKEN: ${INTERARCADE_OBSERVER_TOKEN}
+      INTERARCADE_GIT_VERSION: ${INTERARCADE_GIT_VERSION:-working-tree}
+      INTERARCADE_ALLOWED_ORIGINS: ${INTERARCADE_ALLOWED_ORIGINS}
+      INTERARCADE_REQUIRE_WORKER_HEARTBEAT: "true"
+      INTERARCADE_WORKER_HEARTBEAT_TIMEOUT_SECONDS: "15"
+      INTERARCADE_LEGACY_SOCKET_QUERY_AUTH: ${INTERARCADE_LEGACY_SOCKET_QUERY_AUTH}
+      EULER_API_KEY: ${EULER_API_KEY}
+      REDIS_URL: ${REDIS_URL}
+      INTERARCADE_LOG_LEVEL: ${INTERARCADE_LOG_LEVEL}
+    volumes:
+      - ..:/app
+    command: ["gunicorn", "--worker-class", "geventwebsocket.gunicorn.workers.GeventWebSocketWorker", "--workers", "1", "--bind", "0.0.0.0:5000", "--timeout", "120", "--graceful-timeout", "30", "--keep-alive", "5", "app:app"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:15000:5000"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile.integration
+    container_name: interarcade-v2-worker
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgresql://interarcade:${INTERARCADE_DB_PASSWORD}@postgres:5432/interarcade
+      INTERARCADE_API_URL: http://api:5000
+      INTERARCADE_SECRET_KEY: ${INTERARCADE_SECRET_KEY}
+      INTERARCADE_SESSION_SECRET: ${INTERARCADE_SESSION_SECRET}
+      INTERARCADE_ADMIN_TOKEN: ${INTERARCADE_ADMIN_TOKEN}
+      INTERARCADE_INTERNAL_EVENT_TOKEN: ${INTERARCADE_INTERNAL_EVENT_TOKEN}
+      INTERARCADE_OBSERVER_TOKEN: ${INTERARCADE_OBSERVER_TOKEN}
+      INTERARCADE_GIT_VERSION: ${INTERARCADE_GIT_VERSION:-working-tree}
+      INTERARCADE_ALLOWED_ORIGINS: ${INTERARCADE_ALLOWED_ORIGINS}
+      INTERARCADE_REQUIRE_WORKER_HEARTBEAT: "true"
+      INTERARCADE_WORKER_HEARTBEAT_TIMEOUT_SECONDS: "15"
+      INTERARCADE_LEGACY_SOCKET_QUERY_AUTH: ${INTERARCADE_LEGACY_SOCKET_QUERY_AUTH}
+      EULER_API_KEY: ${EULER_API_KEY}
+      REDIS_URL: ${REDIS_URL}
+      INTERARCADE_LOG_LEVEL: ${INTERARCADE_LOG_LEVEL}
+    volumes:
+      - ..:/app
+    command: ["python", "-m", "interarcade.worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+volumes:
+  interarcade-v2-postgres-data:

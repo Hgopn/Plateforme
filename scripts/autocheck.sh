@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+[[ -f .env.integration ]] || { echo '{"status":"critical","error":".env.integration missing"}'; exit 2; }
+set -a
+. ./.env.integration
+set +a
+
+python3 scripts/monitor.py
+curl -fsS http://127.0.0.1:15000/health/live >/dev/null
+curl -fsS http://127.0.0.1:15000/health/ready >/dev/null
+docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml exec -T api python -m pytest -q
+docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml exec -T api ruff check .
+docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml exec -T api bandit -q -r interarcade app.py scripts
+command -v node >/dev/null || { echo '{"status":"critical","error":"node is required for game syntax checks"}'; exit 2; }
+for game in slot dark marble fight; do
+  node --check "games/$game/$game.js"
+done
+git diff --check
+echo '{"status":"ok","checks":"monitor,health,pytest,ruff,bandit,javascript,git-diff"}'
