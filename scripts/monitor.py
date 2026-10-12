@@ -13,7 +13,8 @@ from datetime import datetime, timezone
 
 
 def fetch(path: str, token: str | None = None):
-    url = f"{os.getenv('INTERARCADE_MONITOR_API', 'http://127.0.0.1:15000')}{path}"
+    default_api = f"http://{os.getenv('INTERARCADE_BIND_HOST', '127.0.0.1')}:15000"
+    url = f"{os.getenv('INTERARCADE_MONITOR_API', default_api)}{path}"
     request = urllib.request.Request(url)
     if token:
         request.add_header("Authorization", f"Bearer {token}")

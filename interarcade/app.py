@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import secrets
 import logging
+import secrets
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 
@@ -16,11 +16,10 @@ from .config import Config
 from .database import Database
 from .events import event_from_tiktok
 from .logging import configure_logging
-from .licenses import LicenseStore
-from .models import RuntimeRegistry, Session, Tenant
 
 
 socketio = SocketIO()
+SUPPORTED_GAMES = ("slot", "dark", "marble", "fight")
 
 
 def _bearer_token():
@@ -29,41 +28,75 @@ def _bearer_token():
 
 
 def create_app(config_class=Config):
+    if not config_class.SESSION_SECRET:
+        raise RuntimeError("INTERARCADE_SESSION_SECRET is required")
     configure_logging(config_class.LOG_LEVEL)
     logger = logging.getLogger("interarcade.api")
-    app = Flask(__name__)
+    project_dir = Path(__file__).resolve().parent.parent
+    app = Flask(
+        __name__,
+        template_folder=str(project_dir / "templates"),
+        static_folder=str(project_dir / "static"),
+    )
     app.config.from_object(config_class)
     database = Database(config_class.DATABASE_URL)
     database.initialize()
     broker = Broker(config_class.BROKER_URL)
     origins = config_class.origins()
-    allowed_origins = origins or ["http://localhost:5000"]
-    CORS(app, origins=allowed_origins)
+    if origins:
+        CORS(app, origins=origins)
     socketio.init_app(
         app,
-        cors_allowed_origins=allowed_origins,
+        cors_allowed_origins=origins or None,
         message_queue=config_class.BROKER_URL or None,
     )
 
-    licenses = LicenseStore(config_class.load_licenses())
-    registry = RuntimeRegistry()
-    app.extensions["licenses"] = licenses
-    app.extensions["registry"] = registry
     app.extensions["database"] = database
     app.extensions["broker"] = broker
 
     def publish_event(event):
-        socketio.emit("ia:event", event.to_dict(), to=f"tenant:{event.tenant_id}")
+        socketio.emit("ia:event", event.to_dict(), to=f"session:{event.session_id}")
+
+    def publish_marble_state(session_id, state):
+        if not state:
+            return
+        session = database.session(session_id)
+        if session:
+            socketio.emit(
+                "ia:game_state",
+                {"schema_version": 1, "game_id": "marble", "session_id": session_id, "state": state},
+                to=f"session:{session_id}",
+            )
+
+    def process_event(event):
+        session = database.session(event.session_id)
+        if not session:
+            return False, None, "session_not_found"
+        if session["tenant_id"] != event.tenant_id:
+            return False, None, "session_tenant_mismatch"
+        if session.get("status") != "active":
+            return False, None, "session_inactive"
+        marble_state = None
+        if session.get("game_id") == "marble":
+            round_state = database.marble_round(event.session_id)
+            if round_state and round_state["status"] == "active":
+                accepted, marble_state = database.apply_marble_event(event.to_dict(), round_state["config"])
+            else:
+                accepted = database.record_event(event.to_dict())
+        else:
+            accepted = database.record_event(event.to_dict())
+        if accepted:
+            publish_event(event)
+            publish_marble_state(event.session_id, marble_state)
+        return bool(accepted), marble_state, None if accepted else "duplicate_event"
 
     def authorize_request(data, game_id=None):
         token = _bearer_token() or (data or {}).get("license_key", "")
         if config_class.ADMIN_TOKEN and secrets.compare_digest(token, config_class.ADMIN_TOKEN):
-            return Tenant(data.get("tenant_id") or data.get("username"), data.get("username") or data.get("tenant_id"), games=[])
+            return {"games": list(SUPPORTED_GAMES)}
         tenant_id = (data or {}).get("tenant_id") or (data or {}).get("username")
         item = database.license_for(tenant_id or "", token)
-        if item and (not game_id or game_id in item["games"]):
-            return item
-        return licenses.authorize(tenant_id or "", token, game_id=game_id)
+        return item if item and (not game_id or game_id in item["games"]) else None
 
     def authorize_admin():
         token = _bearer_token()
@@ -95,7 +128,7 @@ def create_app(config_class=Config):
             "version": config_class.GIT_VERSION,
             "checks": {"database": database_ok, "broker": broker_ok, "worker": worker_ok},
             "worker": {"heartbeat": heartbeat},
-        }), (200 if database_ok and worker_ok else 503)
+        }), (200 if database_ok and broker_ok and worker_ok else 503)
 
     @app.get("/health/live")
     def health_live():
@@ -106,9 +139,15 @@ def create_app(config_class=Config):
         response = health()
         return response
 
+    @app.get("/")
+    def demo_index():
+        if not config_class.DEMO_MODE:
+            return jsonify({"error": "demo_disabled"}), 404
+        return render_template("demo.html", demo_username=config_class.DEMO_USERNAME)
+
     @app.get("/games/manifest.json")
     def games_manifest():
-        return jsonify({"schema_version": 1, "games": ["slot", "dark", "marble", "fight"]})
+        return jsonify({"schema_version": 1, "games": list(SUPPORTED_GAMES)})
 
     @app.get("/games/<path:filename>")
     def serve_game_file(filename):
@@ -118,21 +157,56 @@ def create_app(config_class=Config):
     def create_session():
         data = request.get_json(silent=True) or {}
         tenant_id = (data.get("tenant_id") or data.get("username") or "").strip()
-        game_id = (data.get("game_id") or "").strip() or None
+        game_id = (data.get("game_id") or "").strip()
+        if not tenant_id or game_id not in SUPPORTED_GAMES:
+            return jsonify({"error": "invalid_session_request"}), 400
         license_item = authorize_request(data, game_id=game_id)
         if not license_item:
             return jsonify({"error": "unauthorized"}), 401
         username = data.get("username") or tenant_id
         session_id = secrets.token_urlsafe(18)
-        games = license_item.get("games", []) if isinstance(license_item, dict) else list(getattr(license_item, "games", []))
-        tenant = Tenant(tenant_id, username, games=list(games))
-        registry.tenants[tenant_id] = tenant
-        registry.sessions[session_id] = Session(session_id, tenant_id, username, game_id=game_id)
         database.upsert_tenant(tenant_id, username)
         database.upsert_user(f"user:{tenant_id}:{username}", tenant_id, username, role="viewer")
         database.save_session(session_id, tenant_id, game_id)
         token = issue_token(app.config["SESSION_SECRET"], {"tenant_id": tenant_id, "session_id": session_id})
         return jsonify({"session_id": session_id, "token": token, "tenant_id": tenant_id}), 201
+
+    def authorized_session(session_id):
+        claims = verify_token(app.config["SESSION_SECRET"], _bearer_token())
+        if not claims or claims.get("session_id") != session_id:
+            return None
+        session = database.session(session_id)
+        return session if session and claims.get("tenant_id") == session["tenant_id"] else None
+
+    @app.post("/api/v1/sessions/<session_id>/games/marble/start")
+    def start_marble_round(session_id):
+        session = authorized_session(session_id)
+        if not session or session.get("status") != "active" or session.get("game_id") != "marble":
+            return jsonify({"error": "unauthorized_or_wrong_game"}), 401
+        data = request.get_json(silent=True) or {}
+        from .games.marble import MarbleConfig
+
+        config = MarbleConfig.from_mapping(data.get("config")).to_dict()
+        round_state = database.start_marble_round(secrets.token_urlsafe(18), session_id, config, reset=bool(data.get("reset")))
+        publish_marble_state(session_id, round_state)
+        return jsonify({"schema_version": 1, "game_id": "marble", "session_id": session_id, "state": round_state}), 201
+
+    @app.get("/api/v1/sessions/<session_id>/games/marble/state")
+    def marble_state(session_id):
+        session = authorized_session(session_id)
+        if not session or session.get("game_id") != "marble":
+            return jsonify({"error": "unauthorized_or_wrong_game"}), 401
+        return jsonify({"schema_version": 1, "game_id": "marble", "session_id": session_id, "state": database.marble_round(session_id)})
+
+    @app.post("/api/v1/sessions/<session_id>/end")
+    def end_session(session_id):
+        if not authorized_session(session_id):
+            return jsonify({"error": "unauthorized"}), 401
+        database.end_session(session_id)
+        for listener in database.listeners():
+            if listener.get("session_id") == session_id and listener.get("status") in {"starting", "running"}:
+                database.update_listener(listener["tenant_id"], "stopping")
+        return jsonify({"session_id": session_id, "status": "ended"}), 200
 
     @app.get("/api/v1/listeners")
     def listener_status():
@@ -141,26 +215,23 @@ def create_app(config_class=Config):
         return jsonify({"listeners": database.listeners()})
 
     @app.post("/api/v1/listeners/start")
-    @app.post("/start_listener")
     def start_listener():
         data = request.get_json(silent=True) or {}
         tenant_id = (data.get("tenant_id") or data.get("username") or "").strip()
         username = (data.get("username") or tenant_id).strip()
+        session_id = (data.get("session_id") or "").strip()
+        session = database.session(session_id) if session_id else None
         if not authorize_admin() or not tenant_id or not username:
             return jsonify({"error": "unauthorized_or_missing_identity"}), 401
-        if not database.fetchone("SELECT id FROM tenants WHERE id = ? AND enabled = 1", (tenant_id,)):
-            return jsonify({"error": "tenant_not_found"}), 404
+        if not session or session["tenant_id"] != tenant_id or session["status"] != "active":
+            return jsonify({"error": "active_session_not_found"}), 404
         current = next((row for row in database.listeners() if row["tenant_id"] == tenant_id), None)
         if current and current["status"] in {"running", "starting"}:
             return jsonify({"status": "already_running", "tenant_id": tenant_id}), 200
-        session_id = data.get("session_id") or secrets.token_urlsafe(18)
-        database.upsert_tenant(tenant_id, username)
-        database.save_session(session_id, tenant_id, data.get("game_id"))
         database.save_listener(tenant_id, username, session_id, "starting")
         return jsonify({"status": "started", "tenant_id": tenant_id, "session_id": session_id}), 202
 
     @app.post("/api/v1/listeners/stop")
-    @app.post("/stop_listener")
     def stop_listener():
         data = request.get_json(silent=True) or {}
         tenant_id = (data.get("tenant_id") or data.get("username") or "").strip()
@@ -197,9 +268,77 @@ def create_app(config_class=Config):
             )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
-        if database.record_event(event.to_dict()):
-            publish_event(event)
-        return jsonify(event.to_dict()), 202
+        accepted, _, rejection = process_event(event)
+        if rejection == "session_not_found":
+            return jsonify({"error": rejection}), 404
+        if rejection in {"session_tenant_mismatch", "session_inactive"}:
+            return jsonify({"error": rejection}), 409
+        response = event.to_dict()
+        response["accepted"] = accepted
+        return jsonify(response), (202 if accepted else 200)
+
+    @app.get("/api/v1/demo/status")
+    def demo_status():
+        if not config_class.DEMO_MODE:
+            return jsonify({"error": "demo_disabled"}), 404
+        health_response, _ = health()
+        health_data = health_response.get_json()
+        return jsonify({
+            "version": config_class.GIT_VERSION,
+            "health": {
+                "api": health_data["status"] == "ok",
+                "worker": health_data["checks"]["worker"],
+                "database": health_data["checks"]["database"],
+            },
+        })
+
+    @app.post("/api/v1/demo/session")
+    def demo_session():
+        if not config_class.DEMO_MODE:
+            return jsonify({"error": "demo_disabled"}), 404
+        data = request.get_json(silent=True) or {}
+        game_id = (data.get("game_id") or "").strip()
+        if game_id not in SUPPORTED_GAMES:
+            return jsonify({"error": "invalid_game"}), 400
+        tenant_id = config_class.DEMO_TENANT_ID
+        username = config_class.DEMO_USERNAME
+        session_id = secrets.token_urlsafe(18)
+        database.upsert_tenant(tenant_id, username)
+        database.upsert_user(f"demo:{tenant_id}:{username}", tenant_id, username, role="viewer")
+        database.save_session(session_id, tenant_id, game_id)
+        token = issue_token(app.config["SESSION_SECRET"], {"tenant_id": tenant_id, "session_id": session_id})
+        return jsonify({"session_id": session_id, "token": token, "tenant_id": tenant_id, "username": username}), 201
+
+    @app.post("/api/v1/demo/events")
+    def demo_event():
+        if not config_class.DEMO_MODE:
+            return jsonify({"error": "demo_disabled"}), 404
+        data = request.get_json(silent=True) or {}
+        session_id = data.get("session_id")
+        session = database.session(session_id) if isinstance(session_id, str) else None
+        if not session or session["tenant_id"] != config_class.DEMO_TENANT_ID:
+            return jsonify({"error": "invalid_demo_session"}), 400
+        payload = data.get("payload", {})
+        required = (data.get("type"), data.get("actor"))
+        if not all(isinstance(value, str) and value.strip() for value in required) or not isinstance(payload, dict):
+            return jsonify({"error": "invalid_event"}), 400
+        try:
+            event = event_from_tiktok(
+                config_class.DEMO_TENANT_ID,
+                session_id,
+                data["type"],
+                data["actor"],
+                **payload,
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        accepted, _, rejection = process_event(event)
+        if rejection:
+            status = 404 if rejection == "session_not_found" else 409
+            return jsonify({"error": rejection}), status
+        response = event.to_dict()
+        response["accepted"] = accepted
+        return jsonify(response), 202
 
     @app.get("/api/v1/diagnostics")
     def diagnostics():
@@ -235,28 +374,18 @@ def create_app(config_class=Config):
     def socket_connect(auth=None):
         auth = auth or {}
         claims = verify_token(app.config["SESSION_SECRET"], auth.get("token", ""))
-        tenant_id = claims.get("tenant_id") if claims else None
-        if not tenant_id and config_class.LEGACY_SOCKET_QUERY_AUTH:
-            tenant_id = request.args.get("username", "").strip() or None
-        if not tenant_id:
+        session_id = claims.get("session_id") if claims else None
+        session = database.session(session_id) if session_id else None
+        if (
+            not claims
+            or not session
+            or session["status"] != "active"
+            or claims.get("tenant_id") != session["tenant_id"]
+        ):
             return False
         from flask_socketio import join_room
 
-        join_room(f"tenant:{tenant_id}")
-        emit("ia:ready", {"schema_version": 1, "tenant_id": tenant_id})
+        join_room(f"session:{session_id}")
+        emit("ia:ready", {"schema_version": 1, "tenant_id": session["tenant_id"], "session_id": session_id})
 
     return app
-
-
-app = create_app()
-
-
-if __name__ == "__main__":
-    # The integration stack is intentionally local-only. Public deployments
-    # must use a production WSGI/Socket.IO server instead of Werkzeug.
-    socketio.run(
-        app,
-        host=app.config["HOST"],
-        port=app.config["PORT"],
-        allow_unsafe_werkzeug=True,
-    )

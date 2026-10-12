@@ -3,11 +3,15 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+set -a
+. ./.env.integration
+set +a
 COMPOSE=(docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml)
+HEALTH_URL="http://${INTERARCADE_BIND_HOST:-127.0.0.1}:15000"
 
 wait_ready() {
   for _ in $(seq 1 40); do
-    if curl -fsS http://127.0.0.1:15000/health/ready >/dev/null; then return 0; fi
+    if curl -fsS "$HEALTH_URL/health/ready" >/dev/null 2>&1; then return 0; fi
     sleep 1
   done
   return 1
@@ -22,7 +26,7 @@ wait_ready
 
 "${COMPOSE[@]}" stop worker >/dev/null
 sleep 17
-if curl -fsS http://127.0.0.1:15000/health/ready >/dev/null; then
+if curl -fsS "$HEALTH_URL/health/ready" >/dev/null 2>&1; then
   echo "worker outage was not detected" >&2
   exit 1
 fi
@@ -31,7 +35,7 @@ wait_ready
 
 "${COMPOSE[@]}" stop postgres >/dev/null
 sleep 2
-if curl -fsS http://127.0.0.1:15000/health/ready >/dev/null; then
+if curl -fsS "$HEALTH_URL/health/ready" >/dev/null 2>&1; then
   echo "database outage was not detected" >&2
   exit 1
 fi

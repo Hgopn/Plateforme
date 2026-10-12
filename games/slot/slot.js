@@ -1,5 +1,5 @@
 // ======================================================
-// slot.js — Machine à sous InterArcade (OVH + TikTok Live)
+// slot.js — Machine à sous InterArcade
 // ======================================================
 
 // --- Variables globales ---
@@ -37,17 +37,6 @@ document.addEventListener("DOMContentLoaded", () => {
   applyGameScale();
   window.addEventListener("resize", applyGameScale);
   // ======================================================
-
-  // --- Compatibilité Electron ---
-  let ipcRenderer = null;
-  try {
-    if (window.require) {
-      const electron = window.require("electron");
-      ipcRenderer = electron.ipcRenderer;
-    }
-  } catch {
-    console.warn("⚠️ ipcRenderer non disponible (mode navigateur).");
-  }
 
   // === FILE D’ATTENTE DE SPINS ===
   function enqueueSpin(payload) {
@@ -112,8 +101,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!scores[playerName]) scores[playerName] = 0;
 
     resultEl.textContent = `🎁 ${playerName} envoie ${event.gift || "cadeau"} x${event.count || 1}`;
-    playSound("spin-start");
-
     for (let i = 0; i < spinCount; i++) {
       reels.forEach((r) => {
         r.textContent = symbols[Math.floor(Math.random() * symbols.length)];
@@ -130,15 +117,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (unique === 1) {
       scores[playerName] += 50;
       resultEl.textContent = `🎉 JACKPOT pour ${playerName} !`;
-      playSound("jackpot");
     } else if (unique === 2) {
       scores[playerName] += 25;
       resultEl.textContent = `✨ Deux symboles identiques ! Bien joué ${playerName}`;
-      playSound("small-win");
     } else {
       scores[playerName] += 5;
       resultEl.textContent = `😅 Merci ${playerName} pour le soutien`;
-      playSound("fail");
     }
 
     updateLeaderboard();
@@ -150,26 +134,15 @@ document.addEventListener("DOMContentLoaded", () => {
     return new Promise((r) => setTimeout(r, ms));
   }
 
-  function playSound(type) {
-    const audio = document.createElement("audio");
-    if (type === "spin-start") audio.src = "../assets/sound_spin.mp3";
-    else if (type === "jackpot") audio.src = "../assets/sound_jackpot.mp3";
-    else if (type === "small-win") audio.src = "../assets/sound_smallwin.mp3";
-    else audio.src = "../assets/sound_fail.mp3";
-    audio.volume = 0.3;
-    audio.play().catch(() => {});
-  }
-
   // 🎮 Bouton manuel (test local)
   spinBtn.addEventListener("click", () => {
     enqueueSpin({ from: "Test", gift: "Manuel", count: 1 });
   });
 
   // ======================================================
-  // 🔗 Connexion Socket.IO vers ton serveur OVH (InterArcade)
+  // Connexion Socket.IO InterArcade
   // ======================================================
   const urlParams = new URLSearchParams(window.location.search);
-  const USERNAME = urlParams.get("username") || "songmicon";
   const SOCKET_URL = window.location.origin;
 
   let socket = null;

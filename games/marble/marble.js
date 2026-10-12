@@ -1,180 +1,106 @@
-console.log("[marble] JS chargé");
+"use strict";
 
-// ===============================
-// 🔗 CONNEXION AU BACKEND OVH
-// ===============================
-let ipcRenderer = null;
-let socket = null;
-
-try {
-  if (window.require) {
-    ipcRenderer = window.require("electron").ipcRenderer;
-  }
-} catch {}
-
-// username
-const USERNAME = new URLSearchParams(window.location.search).get("username") || "songmicon";
+// Marble V2 is a renderer: scores, round status and the winner come from API.
+const params = new URLSearchParams(window.location.search);
+const SESSION_ID = params.get("session_id") || "";
+const TOKEN = params.get("token") || "";
 const SOCKET_URL = window.location.origin;
-
-// scores
-let giftScore = 0;
-let likeScore = 0;
-
-let giftProgress = 0;
-let likeProgress = 0;
-
-const GIFT_TARGET = 50;
-const LIKE_TARGET = 500;
-
-const OBSTACLE_POSITIONS = [0.15, 0.33, 0.55, 0.75, 0.9];
-let hitGiftObstacles = new Set();
-let hitLikeObstacles = new Set();
-
-// DOM elements
-let giftScoreEl, likeScoreEl;
-let pathEl, totalLength;
-let ballGiftEl, ballLikeEl;
+const DEFAULT_CONFIG = { gift_target: 50, like_target: 500, like_unit: 15, lion_multiplier: 4 };
+let config = { ...DEFAULT_CONFIG };
+let pathEl;
+let totalLength = 0;
+let giftBall;
+let likeBall;
 let obstaclesGroup;
+const obstaclePositions = [0.15, 0.33, 0.55, 0.75, 0.9];
 
-// ===============================
-// INIT DOM
-// ===============================
-document.addEventListener("DOMContentLoaded", () => {
+function logError(message, error) {
+  console.error(`[MARBLE] ${message}`, error);
+  const status = document.getElementById("marble-status");
+  if (status) status.textContent = `Erreur : ${message}`;
+}
 
-  giftScoreEl = document.getElementById("gift-score");
-  likeScoreEl = document.getElementById("like-score");
-  pathEl = document.getElementById("track-path");
-  ballGiftEl = document.getElementById("ball-gift");
-  ballLikeEl = document.getElementById("ball-like");
-  obstaclesGroup = document.getElementById("obstacles");
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}`, ...(options.headers || {}) },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+  return body;
+}
 
-  if (!pathEl) {
-    console.error("[MARBLE] track-path introuvable.");
+function setBallPosition(ball, progress) {
+  if (!pathEl || !totalLength || !ball) return;
+  const point = pathEl.getPointAtLength(Math.max(0, Math.min(1, progress)) * totalLength);
+  ball.setAttribute("cx", point.x);
+  ball.setAttribute("cy", point.y);
+}
+
+function renderObstacles() {
+  obstaclesGroup.innerHTML = "";
+  obstaclePositions.forEach((position) => {
+    const point = pathEl.getPointAtLength(position * totalLength);
+    const obstacle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    obstacle.setAttribute("cx", point.x); obstacle.setAttribute("cy", point.y);
+    obstacle.setAttribute("r", 14); obstacle.setAttribute("class", "obstacle");
+    obstaclesGroup.appendChild(obstacle);
+  });
+}
+
+function renderState(nextState) {
+  if (!nextState) return;
+  config = nextState.config || config;
+  document.getElementById("gift-score").textContent = `${nextState.gift_score} / ${config.gift_target}`;
+  document.getElementById("like-score").textContent = `${nextState.like_score} / ${config.like_target}`;
+  setBallPosition(giftBall, nextState.gift_score / config.gift_target);
+  setBallPosition(likeBall, nextState.like_score / config.like_target);
+  const status = document.getElementById("marble-status");
+  if (nextState.status === "finished") {
+    status.textContent = `Manche terminée — victoire ${nextState.winner}`;
+    status.dataset.state = "finished";
+  } else if (nextState.status === "ended") {
+    status.textContent = "Session terminée";
+    status.dataset.state = "ended";
+  } else {
+    status.textContent = "Manche active — en attente des interactions";
+    status.dataset.state = "active";
+  }
+}
+
+async function startRound(reset = false) {
+  if (!SESSION_ID || !TOKEN) {
+    logError("session absente", new Error("session_id et token requis"));
     return;
   }
-
-  totalLength = pathEl.getTotalLength();
-
-  createObstacles();
-  setBallPosition(ballGiftEl, 0);
-  setBallPosition(ballLikeEl, 0);
-
-  connectSocket();
-});
-
-// ===============================
-// SOCKET.IO
-// ===============================
-function connectSocket() {
   try {
-    socket = io(SOCKET_URL, {
-      transports: ["websocket"],
-      auth: { token: new URLSearchParams(window.location.search).get("token") || "" }
+    const requestedConfig = JSON.parse(params.get("marble_config") || "{}");
+    const result = await api(`/api/v1/sessions/${encodeURIComponent(SESSION_ID)}/games/marble/start`, {
+      method: "POST",
+      body: JSON.stringify({ config: requestedConfig, reset }),
     });
-
-    socket.on("ia:event", data => {
-      if (!data || (data.target && data.target !== USERNAME)) return;
-      const event = data.payload || data;
-      if (data.type === "gift") handleGiftEvent(event);
-      if (data.type === "like") handleLikeEvent(event);
-    });
-
-  } catch (err) {
-    console.error("Socket error", err);
-  }
+    renderState(result.state);
+  } catch (error) { logError("démarrage de la manche impossible", error); }
 }
 
-// ===============================
-// PISTE
-// ===============================
-function setBallPosition(ballEl, progress) {
-  const dist = Math.max(0, Math.min(1, progress)) * totalLength;
-  const pt = pathEl.getPointAtLength(dist);
-  ballEl.setAttribute("cx", pt.x);
-  ballEl.setAttribute("cy", pt.y);
-}
-
-function createObstacles() {
-  obstaclesGroup.innerHTML = "";
-  OBSTACLE_POSITIONS.forEach(pos => {
-    const pt = pathEl.getPointAtLength(pos * totalLength);
-    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    c.setAttribute("cx", pt.x);
-    c.setAttribute("cy", pt.y);
-    c.setAttribute("r", 14);
-    c.setAttribute("class", "obstacle");
-    obstaclesGroup.appendChild(c);
+function connectSocket() {
+  if (!window.io) { logError("Socket.IO indisponible", new Error("client absent")); return; }
+  const socket = window.io(SOCKET_URL, { transports: ["websocket"], auth: { token: TOKEN } });
+  socket.on("connect_error", (error) => logError("connexion Socket.IO impossible", error));
+  socket.on("ia:game_state", (message) => {
+    if (message?.game_id === "marble" && message.session_id === SESSION_ID) renderState(message.state);
   });
 }
 
-function applyObstaclePenalty(progress, lastProgress, hitSet, label) {
-  let newP = progress;
-  OBSTACLE_POSITIONS.forEach(pos => {
-    if (lastProgress < pos && newP >= pos && !hitSet.has(pos)) {
-      hitSet.add(pos);
-      newP -= 0.04;
-    }
-  });
-  return Math.max(0, newP);
-}
-
-// ===============================
-// EVENTS
-// ===============================
-function handleGiftEvent(e) {
-  const count = e.count || 1;
-  const giftName = (e.gift || "").toLowerCase();
-
-  let power = count;
-  if (giftName.includes("lion") || giftName.includes("unicorn")) power *= 4;
-
-  giftScore += power;
-  giftScoreEl.textContent = giftScore;
-
-  const last = giftProgress;
-  giftProgress = Math.min(1, giftScore / GIFT_TARGET);
-  giftProgress = applyObstaclePenalty(giftProgress, last, hitGiftObstacles, "GIFTS");
-
-  setBallPosition(ballGiftEl, giftProgress);
-
-  if (giftProgress >= 1) onRaceEnd("GIFTS");
-}
-
-function handleLikeEvent(e) {
-  const count = e.count || 1;
-
-  likeScore += count / 15;
-  likeScoreEl.textContent = Math.round(likeScore);
-
-  const last = likeProgress;
-  likeProgress = Math.min(1, likeScore / LIKE_TARGET);
-  likeProgress = applyObstaclePenalty(likeProgress, last, hitLikeObstacles, "LIKES");
-
-  setBallPosition(ballLikeEl, likeProgress);
-
-  if (likeProgress >= 1) onRaceEnd("LIKES");
-}
-
-// ===============================
-// FIN DE COURSE
-// ===============================
-function onRaceEnd(winner) {
-  flashFinish(winner);
-}
-
-function flashFinish(winner) {
-  const flash = document.createElement("div");
-  flash.style.position = "fixed";
-  flash.style.inset = "0";
-  flash.style.background = winner === "GIFTS"
-    ? "rgba(255,215,0,0.45)"
-    : "rgba(255,0,255,0.45)";
-  flash.style.zIndex = "999";
-  flash.style.transition = "opacity .5s";
-  document.body.appendChild(flash);
-
-  setTimeout(() => {
-    flash.style.opacity = "0";
-    setTimeout(() => flash.remove(), 500);
-  }, 50);
-}
+document.addEventListener("DOMContentLoaded", () => {
+  pathEl = document.getElementById("track-path");
+  giftBall = document.getElementById("ball-gift");
+  likeBall = document.getElementById("ball-like");
+  obstaclesGroup = document.getElementById("obstacles");
+  if (!pathEl || !obstaclesGroup) { logError("structure du plateau absente", new Error("track-path/obstacles")); return; }
+  totalLength = pathEl.getTotalLength();
+  renderObstacles();
+  document.getElementById("reset-round").addEventListener("click", () => startRound(true));
+  connectSocket();
+  startRound();
+});

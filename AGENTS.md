@@ -1,5 +1,14 @@
 # InterArcade V2 instructions for AI agents
 
+## Product reference
+
+Read [docs/PRODUCT_VISION.md](/opt/interarcade/docs/PRODUCT_VISION.md) before
+changing user-facing behavior. InterArcade is a paid launcher/application for
+TikTok Live creators: the website presents and sells the product, while the
+installed app handles account, license, game library, TikTok connection, live
+sessions, and history. Do not describe it as an AI dashboard or a generic game
+website. Keep internal diagnostics/admin tools separate from creator UX.
+
 ## Architecture
 
 - `app.py` starts the Flask/Socket.IO API.
@@ -12,7 +21,9 @@
   be imported as part of the API startup path.
 - `interarcade/worker/tiktok.py` contains TikTokLive-specific behavior.
 - `interarcade/events.py` defines the versioned `ia:event` contract.
-- `interarcade/migrate_licenses.py` imports the legacy `licenses.json` data.
+- `interarcade/games/marble.py` defines the server-authoritative Marble rules;
+  the browser renders state and never owns the official score.
+- PostgreSQL is the only runtime source of truth for licenses and entitlements.
 - `interarcade/logging.py` emits structured JSON logs.
 - Games are static clients under `games/` and consume authenticated,
   versioned events. They are not authoritative for scores or identity.
@@ -50,9 +61,11 @@ python3 scripts/diagnostic.py
 ```
 
 The integration scripts use `.env.integration`, which is generated locally,
-permission-restricted, and ignored by Git. The stack binds API and PostgreSQL
-to loopback only. Redis is optional until multiple API instances or brokered
-Socket.IO fan-out is introduced.
+permission-restricted, and ignored by Git. The default stack binds API and
+PostgreSQL to loopback; the local demo may bind the API temporarily to the
+configured private LAN address, while PostgreSQL remains loopback-only. Redis
+is optional until multiple API instances or brokered Socket.IO fan-out is
+introduced.
 
 `monitor.sh` emits one JSON record by default and can run periodically with
 `./scripts/monitor.sh --watch --interval 30`. Severity is `info`, `warning`,
@@ -60,6 +73,11 @@ or `critical`; critical means health is unavailable/degraded, while warnings
 include stale worker heartbeats, persisted runtime errors, or recent log
 errors. `autocheck.sh` returns non-zero on a critical diagnostic or any failed
 test/security/syntax check.
+
+For the Marble pilot, also read `docs/MARBLE_PILOT.md`. Do not add client-side
+score authority, accept unnormalized TikTok payloads, or start a real TikTok
+connection without an explicitly supplied test account and approved runtime
+credentials.
 
 ## Git rules
 

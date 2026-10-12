@@ -17,7 +17,6 @@ if [[ ! -f .env.integration ]]; then
     echo "INTERARCADE_INTERNAL_EVENT_TOKEN=$(openssl rand -hex 32)"
     echo "INTERARCADE_OBSERVER_TOKEN=$(openssl rand -hex 32)"
     echo "INTERARCADE_ALLOWED_ORIGINS=http://127.0.0.1:15000,http://localhost:15000,http://api:5000"
-    echo "INTERARCADE_LEGACY_SOCKET_QUERY_AUTH=false"
     echo "EULER_API_KEY="
     echo "REDIS_URL="
     echo "INTERARCADE_LOG_LEVEL=INFO"
@@ -25,18 +24,19 @@ if [[ ! -f .env.integration ]]; then
   echo "Created .env.integration with mode 600"
 fi
 
-mkdir -p .runtime/backups
+set -a
+. ./.env.integration
+set +a
+INTERARCADE_HEALTH_URL="http://${INTERARCADE_BIND_HOST:-127.0.0.1}:15000"
 export INTERARCADE_GIT_VERSION="${INTERARCADE_GIT_VERSION:-$(git rev-parse --short HEAD 2>/dev/null || echo working-tree)}"
 docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml up -d --build
 
 for attempt in $(seq 1 40); do
-  if curl -fsS http://127.0.0.1:15000/health/ready >/tmp/interarcade-health.json 2>/dev/null; then
+  if curl -fsS "$INTERARCADE_HEALTH_URL/health/ready" >/dev/null 2>/dev/null; then
     break
   fi
   [[ "$attempt" == 40 ]] && { docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml ps; exit 1; }
   sleep 2
 done
 
-docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml exec -T api \
-  python -m interarcade.migrate_licenses
-echo "InterArcade integration stack is ready on 127.0.0.1:15000"
+echo "InterArcade integration stack is ready on ${INTERARCADE_HEALTH_URL}"

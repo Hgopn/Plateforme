@@ -1,5 +1,8 @@
 # InterArcade V2 runtime phase journal
 
+This file records the historical runtime phase. See `ANOMALIES.md` and the
+current source for the active baseline behavior.
+
 ## 2026-09-17 — branch `interarcade-v2-runtime`
 
 - Created from `interarcade-v2-foundation` before runtime changes.

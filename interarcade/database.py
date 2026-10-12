@@ -88,6 +88,22 @@ SCHEMA = (
         updated_at TEXT NOT NULL
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS marble_rounds (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        round_number INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        config_json TEXT NOT NULL,
+        gift_score INTEGER NOT NULL DEFAULT 0,
+        like_score INTEGER NOT NULL DEFAULT 0,
+        winner TEXT,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        updated_at TEXT NOT NULL,
+        UNIQUE (session_id, round_number)
+    )
+    """,
 )
 
 
@@ -170,8 +186,27 @@ class Database:
     def initialize(self):
         with self.connection() as connection:
             cursor = connection.cursor()
+            if self.backend == "postgresql":
+                # API and worker start together. Serialize idempotent DDL because
+                # PostgreSQL can still race on catalog rows with IF NOT EXISTS.
+                cursor.execute("SELECT pg_advisory_xact_lock(hashtext('interarcade_schema_v2'))")
             for statement in SCHEMA:
                 cursor.execute(statement)
+            if self.backend == "postgresql":
+                # PostgreSQL does not auto-increment an ``INTEGER PRIMARY KEY``.
+                # Keep the existing table compatible and give new rows a safe id.
+                cursor.execute("CREATE SEQUENCE IF NOT EXISTS runtime_errors_id_seq")
+                cursor.execute(
+                    "SELECT setval('runtime_errors_id_seq', "
+                    "COALESCE((SELECT MAX(id) FROM runtime_errors), 0) + 1, false)"
+                )
+                cursor.execute(
+                    "ALTER TABLE runtime_errors ALTER COLUMN id "
+                    "SET DEFAULT nextval('runtime_errors_id_seq')"
+                )
+                cursor.execute(
+                    "ALTER SEQUENCE runtime_errors_id_seq OWNED BY runtime_errors.id"
+                )
 
     def ping(self):
         return self.fetchone("SELECT 1") is not None
@@ -231,6 +266,74 @@ class Database:
             "INSERT INTO live_sessions (id, tenant_id, game_id, status, started_at) VALUES (?, ?, ?, 'active', ?) ON CONFLICT(id) DO NOTHING",
             (session_id, tenant_id, game_id, now()),
         )
+
+    def end_session(self, session_id: str):
+        timestamp = now()
+        with self.connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(self._sql("UPDATE live_sessions SET status = 'ended', ended_at = ? WHERE id = ? AND status = 'active'"), (timestamp, session_id))
+            cursor.execute(self._sql("UPDATE marble_rounds SET status = 'ended', ended_at = ?, updated_at = ? WHERE session_id = ? AND status = 'active'"), (timestamp, timestamp, session_id))
+
+    def session(self, session_id: str):
+        return self.fetchone("SELECT * FROM live_sessions WHERE id = ?", (session_id,))
+
+    def start_marble_round(self, round_id: str, session_id: str, config: dict, reset: bool = False):
+        current = self.marble_round(session_id)
+        if current and current["status"] == "active" and not reset:
+            return current
+        if current and current["status"] == "active" and reset:
+            timestamp = now()
+            self.execute(
+                "UPDATE marble_rounds SET status = 'ended', ended_at = ?, updated_at = ? WHERE id = ? AND status = 'active'",
+                (timestamp, timestamp, current["id"]),
+            )
+        next_number = int(current["round_number"]) + 1 if current else 1
+        timestamp = now()
+        self.execute(
+            "INSERT INTO marble_rounds (id, session_id, round_number, status, config_json, started_at, updated_at) "
+            "VALUES (?, ?, ?, 'active', ?, ?, ?)",
+            (round_id, session_id, next_number, json.dumps(config), timestamp, timestamp),
+        )
+        return self.marble_round(session_id)
+
+    def marble_round(self, session_id: str):
+        row = self.fetchone(
+            "SELECT * FROM marble_rounds WHERE session_id = ? ORDER BY round_number DESC LIMIT 1",
+            (session_id,),
+        )
+        if row:
+            row["config"] = json.loads(row.pop("config_json"))
+        return row
+
+    def apply_marble_event(self, event: dict, config: dict):
+        """Atomically accept an event and update the current Marble round."""
+        from .games.marble import MarbleConfig, apply_event
+
+        with self.connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(self._sql(
+                "INSERT INTO event_outbox (event_id, tenant_id, session_id, event_type, payload_json, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(event_id) DO NOTHING"
+            ), (event["event_id"], event["tenant_id"], event["session_id"], event["type"], json.dumps(event.get("payload") or {}), now()))
+            accepted = cursor.rowcount == 1
+            query = "SELECT * FROM marble_rounds WHERE session_id = ? ORDER BY round_number DESC LIMIT 1"
+            if self.backend == "postgresql":
+                query += " FOR UPDATE"
+            cursor.execute(self._sql(query), (event["session_id"],))
+            row = cursor.fetchone()
+            state = self._as_dict(cursor, row)
+            if not state:
+                return accepted, None
+            state["config"] = json.loads(state.pop("config_json"))
+            if accepted:
+                next_state = apply_event(state, event, MarbleConfig.from_mapping(config))
+                ended_at = now() if next_state["status"] == "finished" and state["status"] == "active" else state.get("ended_at")
+                cursor.execute(self._sql(
+                    "UPDATE marble_rounds SET status = ?, gift_score = ?, like_score = ?, winner = ?, ended_at = ?, updated_at = ? WHERE id = ?"
+                ), (next_state["status"], next_state["gift_score"], next_state["like_score"], next_state.get("winner"), ended_at, now(), state["id"]))
+                state = next_state
+                state["ended_at"] = ended_at
+            return accepted, state
 
     def save_listener(self, tenant_id: str, username: str, session_id: str, status: str):
         timestamp = now()

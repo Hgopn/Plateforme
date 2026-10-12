@@ -19,6 +19,8 @@ from .tiktok import TikTokWorker
 class WorkerService:
     def __init__(self, config=Config):
         self.config = config
+        if not config.INTERNAL_EVENT_TOKEN:
+            raise RuntimeError("INTERARCADE_INTERNAL_EVENT_TOKEN is required")
         configure_logging(config.LOG_LEVEL)
         self.database = Database(config.DATABASE_URL)
         self.database.initialize()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -35,5 +36,5 @@ def verify_token(secret: str, token: str) -> dict | None:
         if int(claims.get("exp", 0)) < int(time.time()):
             return None
         return claims
-    except (ValueError, TypeError, json.JSONDecodeError, UnicodeDecodeError):
+    except (ValueError, TypeError, binascii.Error, json.JSONDecodeError, UnicodeDecodeError):
         return None

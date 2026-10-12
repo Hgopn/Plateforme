@@ -30,9 +30,21 @@ class InterArcadeEvent:
     def __post_init__(self):
         if self.type not in SUPPORTED_TYPES:
             raise ValueError(f"unsupported event type: {self.type}")
-        if not self.tenant_id or not self.session_id or not self.actor:
-            raise ValueError("tenant_id, session_id and actor are required")
-
+        if any(
+            not isinstance(value, str) or not value.strip()
+            for value in (self.event_id, self.tenant_id, self.session_id, self.actor)
+        ):
+            raise ValueError("event_id, tenant_id, session_id and actor are required strings")
+        if not isinstance(self.payload, dict):
+            raise ValueError("event payload must be an object")
+        if self.type in {"gift", "like", "share"}:
+            count = self.payload.get("count", 1)
+            if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= 1_000_000:
+                raise ValueError("event count must be an integer between 1 and 1000000")
+        if self.type == "gift" and "gift" in self.payload and not isinstance(self.payload["gift"], str):
+            raise ValueError("gift name must be a string")
+        if self.type == "comment" and not isinstance(self.payload.get("comment", ""), str):
+            raise ValueError("comment must be a string")
     def to_dict(self) -> dict:
         return {
             "schema_version": self.schema_version,

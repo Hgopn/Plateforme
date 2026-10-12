@@ -1,56 +1,31 @@
-console.log("DARK.JS chargé");
-
-// ==================================
-// 🔗 CONNEXION AU BACKEND INTERARCADE
-// ==================================
-let ipcRenderer = null;
 let socket = null;
-
-// Compatibilité Electron
-try {
-  if (window.require) {
-    const electron = window.require("electron");
-    ipcRenderer = electron.ipcRenderer;
-  }
-} catch {
-  console.warn("ipcRenderer non disponible (navigateur)");
-}
-
-// Récupération username (comme Slot)
 const urlParams = new URLSearchParams(window.location.search);
-const USERNAME = urlParams.get("username") || "songmicon";
-
-// Backend OVH
 const SOCKET_URL = window.location.origin;
 
 // Connexion Socket.IO
 try {
-  console.log("🔌 [DARK] Connexion Socket.IO à", SOCKET_URL);
-
   socket = io(SOCKET_URL, {
     transports: ["websocket"],
     auth: { token: urlParams.get("token") || "" }
   });
 
   socket.on("connect", () => {
-    console.log("🟢 [DARK] Connecté au backend OVH");
+    console.log("[DARK] Socket.IO connecté");
   });
 
   socket.on("disconnect", () => {
-    console.warn("🔴 [DARK] Déconnecté du backend OVH");
+    console.warn("[DARK] Socket.IO déconnecté");
   });
 
   // 🎁 Réception des événements TikTok
   socket.on("ia:event", (data) => {
-    console.log("📩 [DARK] Event reçu :", data);
-
     const event = data?.payload || data;
     if (data && data.type === "gift") onGiftEvent(event);
     if (data && data.type === "like") onLikeEvent(event);
   });
 
 } catch (err) {
-  console.error("❌ Erreur Socket.IO :", err);
+  console.error("[DARK] Erreur Socket.IO :", err);
 }
 
 

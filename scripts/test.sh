@@ -5,7 +5,7 @@ cd "$ROOT_DIR"
 docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml exec -T api \
   python -m unittest discover -s tests -v
 docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml exec -T api \
-  python scripts/test_flow.py
+  python -m scripts.test_flow
 for file in games/*/*.js; do node --check "$file"; done
 git diff --check
 echo "InterArcade integration tests passed"

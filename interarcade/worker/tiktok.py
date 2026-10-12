@@ -9,6 +9,21 @@ import threading
 from collections.abc import Callable
 
 
+def _actor(event) -> str:
+    return str(getattr(getattr(event, "user", None), "unique_id", "unknown") or "unknown")
+
+
+def normalize_gift(event) -> tuple[str, dict]:
+    return _actor(event), {
+        "gift": str(getattr(getattr(event, "gift", None), "name", "unknown") or "unknown"),
+        "count": max(1, int(getattr(event, "repeat_count", 1) or 1)),
+    }
+
+
+def normalize_like(event) -> tuple[str, dict]:
+    return _actor(event), {"count": max(1, int(getattr(event, "count", 1) or 1))}
+
+
 class TikTokWorker:
     def __init__(self, username: str, tenant_id: str, session_id: str, emit: Callable, sign_api_key: str = "", on_stopped: Callable | None = None):
         self.username = username
@@ -40,7 +55,7 @@ class TikTokWorker:
         # Imports remain lazy so API-only processes can start without TikTokLive.
         from TikTokLive import TikTokLiveClient
         from TikTokLive.client.errors import UserOfflineError
-        from TikTokLive.events import GiftEvent, LikeEvent
+        from TikTokLive.events import CommentEvent, FollowEvent, GiftEvent, LikeEvent, ShareEvent
 
         if self.sign_api_key:
             os.environ["TIKTOKLIVE_SIGN_API_KEY"] = self.sign_api_key
@@ -51,20 +66,30 @@ class TikTokWorker:
         async def on_gift(event):
             if getattr(event, "repeat_end", True) is False:
                 return
-            self.emit(
-                "gift",
-                getattr(event.user, "unique_id", "unknown"),
-                gift=getattr(event.gift, "name", "unknown"),
-                count=getattr(event, "repeat_count", 1),
-            )
+            actor, payload = normalize_gift(event)
+            await asyncio.to_thread(self.emit, "gift", actor, **payload)
 
         @client.on(LikeEvent)
         async def on_like(event):
-            self.emit(
-                "like",
-                getattr(event.user, "unique_id", "unknown"),
-                count=getattr(event, "total_like_count", 1),
+            actor, payload = normalize_like(event)
+            await asyncio.to_thread(self.emit, "like", actor, **payload)
+
+        @client.on(CommentEvent)
+        async def on_comment(event):
+            await asyncio.to_thread(
+                self.emit,
+                "comment",
+                _actor(event),
+                comment=str(getattr(event, "comment", "") or ""),
             )
+
+        @client.on(ShareEvent)
+        async def on_share(event):
+            await asyncio.to_thread(self.emit, "share", _actor(event), count=1)
+
+        @client.on(FollowEvent)
+        async def on_follow(event):
+            await asyncio.to_thread(self.emit, "follow", _actor(event))
 
         while self.should_run:
             try:

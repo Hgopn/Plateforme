@@ -1,10 +1,9 @@
-import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from interarcade.database import Database
-from interarcade.migrate_licenses import migrate
+from interarcade.games.marble import MarbleConfig, apply_event
 
 
 class RuntimePersistenceTests(unittest.TestCase):
@@ -44,16 +43,29 @@ class RuntimePersistenceTests(unittest.TestCase):
         self.db.save_session("session", "tenant", "slot")
         self.assertEqual(self.db.session_summary(), {"active": 1})
 
-    def test_migrates_legacy_license_file(self):
-        source = Path(self.temp_dir.name) / "licenses.json"
-        source.write_text(
-            json.dumps({"creator": {"key": "KEY", "games": ["slot"]}}),
-            encoding="utf-8",
-        )
-        count = migrate(f"sqlite:///{self.db_path}", str(source))
-        self.assertEqual(count, 1)
-        self.assertEqual(self.db.license_for("creator", "KEY")["games"], ["slot"])
-
+    def test_marble_round_is_server_authoritative_and_duplicate_safe(self):
+        self.db.upsert_tenant("tenant", "creator")
+        self.db.save_session("marble-session", "tenant", "marble")
+        config = MarbleConfig(gift_target=2, like_target=100).to_dict()
+        self.db.start_marble_round("round-1", "marble-session", config)
+        event = {
+            "event_id": "marble-event-1", "tenant_id": "tenant", "session_id": "marble-session",
+            "type": "gift", "actor": "viewer", "payload": {"gift": "Rose", "count": 2},
+        }
+        accepted, finished = self.db.apply_marble_event(event, config)
+        self.assertTrue(accepted)
+        self.assertEqual(finished["gift_score"], 2)
+        self.assertEqual(finished["status"], "finished")
+        accepted, duplicate = self.db.apply_marble_event(event, config)
+        self.assertFalse(accepted)
+        self.assertEqual(duplicate["gift_score"], 2)
+        self.assertEqual(duplicate["winner"], "GIFTS")
+        self.assertEqual(apply_event(finished, event, MarbleConfig.from_mapping(config)), finished)
+        self.db.save_session("marble-session-reset", "tenant", "marble")
+        self.db.start_marble_round("round-reset-1", "marble-session-reset", config)
+        second = self.db.start_marble_round("round-reset-2", "marble-session-reset", config, reset=True)
+        self.assertEqual(second["round_number"], 2)
+        self.assertEqual(self.db.fetchone("SELECT status FROM marble_rounds WHERE id = ?", ("round-reset-1",))["status"], "ended")
 
 if __name__ == "__main__":
     unittest.main()

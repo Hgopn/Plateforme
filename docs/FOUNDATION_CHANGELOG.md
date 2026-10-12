@@ -1,5 +1,8 @@
 # InterArcade V2 foundation journal
 
+This file records the historical foundation phase. Compatibility mechanisms
+listed below may have been removed by later baseline work.
+
 ## 2026-09-17 — branch `interarcade-v2-foundation`
 
 - Created a dedicated Git branch before source changes.

@@ -10,8 +10,9 @@ set -a
 set +a
 
 python3 scripts/monitor.py
-curl -fsS http://127.0.0.1:15000/health/live >/dev/null
-curl -fsS http://127.0.0.1:15000/health/ready >/dev/null
+DEMO_API_URL="http://${INTERARCADE_BIND_HOST:-127.0.0.1}:15000"
+curl -fsS "$DEMO_API_URL/health/live" >/dev/null
+curl -fsS "$DEMO_API_URL/health/ready" >/dev/null
 docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml exec -T api python -m pytest -q
 docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml exec -T api ruff check .
 docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml exec -T api bandit -q -r interarcade app.py scripts
