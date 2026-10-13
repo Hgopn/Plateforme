@@ -14,12 +14,16 @@ from .auth import issue_token, verify_token
 from .broker import Broker
 from .config import Config
 from .database import Database
-from .events import event_from_source
+from .events import PLATFORM_PATTERN, event_from_source
 from .logging import configure_logging
 
 
 socketio = SocketIO()
 SUPPORTED_GAMES = ("slot", "dark", "marble", "fight")
+RESERVED_EVENT_FIELDS = {
+    "source", "tenant_id", "session_id", "event_type", "type", "actor", "event_id",
+    "source_account_id", "source_username", "actor_platform_id", "timestamp", "event_value",
+}
 
 
 def _bearer_token():
@@ -85,7 +89,7 @@ def create_app(config_class=Config):
             to=f"session:{session_id}",
         )
 
-    def process_event(event):
+    def process_event(event, require_source=False):
         session = database.session(event.session_id)
         if not session:
             return False, None, "session_not_found"
@@ -93,6 +97,14 @@ def create_app(config_class=Config):
             return False, None, "session_tenant_mismatch"
         if session.get("status") != "active":
             return False, None, "session_inactive"
+        if require_source:
+            source = database.live_source_for_session(
+                event.session_id, event.source_platform, event.source_account_id
+            )
+            if not source or source["tenant_id"] != event.tenant_id or source["status"] not in {
+                "starting", "running", "simulated"
+            }:
+                return False, None, "source_inactive"
         marble_state = None
         if session.get("game_id") == "marble":
             round_state = database.marble_round(event.session_id)
@@ -131,7 +143,7 @@ def create_app(config_class=Config):
         heartbeat = {"ok": False, "worker_id": None, "pid": None, "updated_at": None}
         if database_ok:
             try:
-                workers = database.listeners()
+                workers = database.live_sources()
                 heartbeat = database.worker_heartbeat(config_class.WORKER_HEARTBEAT_TIMEOUT_SECONDS)
             except Exception as exc:
                 database_ok = False
@@ -293,10 +305,67 @@ def create_app(config_class=Config):
         if not authorized_session(session_id):
             return jsonify({"error": "unauthorized"}), 401
         database.end_session(session_id)
-        for listener in database.listeners():
-            if listener.get("session_id") == session_id and listener.get("status") in {"starting", "running"}:
-                database.update_listener(listener["tenant_id"], "stopping")
         return jsonify({"session_id": session_id, "status": "ended"}), 200
+
+    @app.get("/api/v1/sessions/<session_id>/sources")
+    def session_sources(session_id):
+        if not authorized_session(session_id):
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify({"sources": [
+            {
+                "id": row["id"], "platform": row["platform"],
+                "source_account_id": row["account_id"], "source_username": row["username"],
+                "status": row["status"],
+            }
+            for row in database.live_sources(session_id)
+        ]})
+
+    @app.post("/api/v1/sessions/<session_id>/sources")
+    def attach_source(session_id):
+        if not authorize_admin():
+            return jsonify({"error": "unauthorized"}), 401
+        session = database.session(session_id)
+        if not session or session["status"] != "active":
+            return jsonify({"error": "active_session_not_found"}), 404
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({"error": "invalid_source"}), 400
+        platform = data.get("source_platform")
+        account_id = data.get("source_account_id")
+        username = data.get("source_username")
+        if (
+            not isinstance(platform, str) or not PLATFORM_PATTERN.fullmatch(platform)
+            or not isinstance(account_id, str) or not account_id.strip()
+            or not isinstance(username, str) or not username.strip()
+        ):
+            return jsonify({"error": "invalid_source"}), 400
+        simulated = data.get("simulated") is True
+        if simulated and not config_class.DEMO_MODE:
+            return jsonify({"error": "simulation_disabled"}), 403
+        if not simulated and platform != "tiktok":
+            return jsonify({"error": "connector_unavailable"}), 501
+        current = database.live_source_for_session(session_id, platform, account_id)
+        if current and current["status"] in {"starting", "running", "simulated"}:
+            return jsonify(current), 200
+        source = database.save_live_source(
+            current["id"] if current else secrets.token_urlsafe(18),
+            session["tenant_id"], session_id, platform, account_id, username,
+            "simulated" if simulated else "starting",
+        )
+        return jsonify(source), 202
+
+    @app.post("/api/v1/sources/<source_id>/stop")
+    def stop_source(source_id):
+        if not authorize_admin():
+            return jsonify({"error": "unauthorized"}), 401
+        source = database.live_source(source_id)
+        if not source:
+            return jsonify({"error": "source_not_found"}), 404
+        if source["status"] in {"stopped", "error"}:
+            return jsonify({"id": source_id, "status": source["status"]}), 200
+        status = "stopped" if source["status"] == "simulated" else "stopping"
+        database.update_live_source(source_id, status)
+        return jsonify({"id": source_id, "status": status}), 202
 
     @app.get("/api/v1/listeners")
     def listener_status():
@@ -315,8 +384,11 @@ def create_app(config_class=Config):
             return jsonify({"error": "unauthorized_or_missing_identity"}), 401
         if not session or session["tenant_id"] != tenant_id or session["status"] != "active":
             return jsonify({"error": "active_session_not_found"}), 404
-        current = next((row for row in database.listeners() if row["tenant_id"] == tenant_id), None)
-        if current and current["status"] in {"running", "starting"}:
+        current = next(
+            (row for row in database.listeners() if row["tenant_id"] == tenant_id
+             and row["status"] in {"running", "starting"}), None
+        )
+        if current:
             return jsonify({"status": "already_running", "tenant_id": tenant_id}), 200
         database.save_listener(tenant_id, username, session_id, "starting")
         return jsonify({"status": "started", "tenant_id": tenant_id, "session_id": session_id}), 202
@@ -325,10 +397,13 @@ def create_app(config_class=Config):
     def stop_listener():
         data = request.get_json(silent=True) or {}
         tenant_id = (data.get("tenant_id") or data.get("username") or "").strip()
-        listener = next((row for row in database.listeners() if row["tenant_id"] == tenant_id), None)
+        listener = next(
+            (row for row in database.listeners() if row["tenant_id"] == tenant_id
+             and row["status"] in {"running", "starting"}), None
+        )
         if not authorize_admin() or not tenant_id or not listener:
             return jsonify({"error": "unauthorized_or_not_found"}), 404
-        database.update_listener(tenant_id, "stopping")
+        database.update_live_source(listener["id"], "stopping")
         return jsonify({"status": "stopping", "tenant_id": tenant_id}), 202
 
     @app.post("/api/v1/internal/events")
@@ -341,28 +416,53 @@ def create_app(config_class=Config):
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict) or data.get("schema_version", 1) != 1:
             return jsonify({"error": "unsupported_event_schema"}), 400
-        required = ("tenant_id", "session_id", "type", "actor")
-        if any(not isinstance(data.get(key), str) or not data.get(key).strip() for key in required):
+        source_platform = data.get("source_platform", data.get("source", "tiktok"))
+        event_type = data.get("event_type", data.get("type"))
+        actor = data.get("actor_username", data.get("actor"))
+        if (
+            ("source" in data and data["source"] != source_platform)
+            or ("type" in data and data["type"] != event_type)
+            or ("actor" in data and data["actor"] != actor)
+        ):
+            return jsonify({"error": "conflicting_event_fields"}), 400
+        if any(
+            not isinstance(value, str) or not value.strip()
+            for value in (data.get("tenant_id"), data.get("session_id"), event_type, actor)
+        ):
             return jsonify({"error": "invalid_event"}), 400
+        if any(
+            key in data and (not isinstance(data[key], str) or not data[key].strip())
+            for key in ("source_account_id", "source_username", "actor_platform_id", "source_event_id")
+        ):
+            return jsonify({"error": "invalid_source_identity"}), 400
         payload = data.get("payload", {})
         if not isinstance(payload, dict):
             return jsonify({"error": "invalid_event_payload"}), 400
+        if set(payload) & RESERVED_EVENT_FIELDS:
+            return jsonify({"error": "reserved_payload_field"}), 400
         try:
             event = event_from_source(
-                data.get("source", "tiktok"),
+                source_platform,
                 data["tenant_id"],
                 data["session_id"],
-                data["type"],
-                data["actor"],
-                event_id=data.get("event_id"),
+                event_type,
+                actor,
+                event_id=data.get("source_event_id", data.get("event_id")),
+                source_account_id=data.get("source_account_id"),
+                source_username=data.get("source_username"),
+                actor_platform_id=data.get("actor_platform_id"),
+                timestamp=data.get("timestamp"),
+                event_value=data.get("event_value"),
                 **payload,
             )
+            if "source_event_id" in data and "event_id" in data and data["event_id"] != event.event_id:
+                return jsonify({"error": "invalid_scoped_event_id"}), 400
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
-        accepted, _, rejection = process_event(event)
+        accepted, _, rejection = process_event(event, require_source="source_account_id" in data)
         if rejection == "session_not_found":
             return jsonify({"error": rejection}), 404
-        if rejection in {"session_tenant_mismatch", "session_inactive"}:
+        if rejection in {"session_tenant_mismatch", "session_inactive", "source_inactive"}:
             return jsonify({"error": rejection}), 409
         response = event.to_dict()
         response["accepted"] = accepted
@@ -413,6 +513,8 @@ def create_app(config_class=Config):
         required = (data.get("type"), data.get("actor"))
         if not all(isinstance(value, str) and value.strip() for value in required) or not isinstance(payload, dict):
             return jsonify({"error": "invalid_event"}), 400
+        if set(payload) & RESERVED_EVENT_FIELDS:
+            return jsonify({"error": "reserved_payload_field"}), 400
         try:
             event = event_from_source(
                 "test",
@@ -442,13 +544,14 @@ def create_app(config_class=Config):
             database_health = database.ping()
             worker_health = database.worker_heartbeat(config_class.WORKER_HEARTBEAT_TIMEOUT_SECONDS) if database_health else {"ok": False}
             listeners = database.listeners() if database_health else []
+            live_sources = database.live_sources() if database_health else []
             sessions = database.session_summary() if database_health else {}
             recent_errors = database.recent_errors() if database_health else []
         except Exception as exc:
             logger.error("diagnostics database check failed", exc_info=exc, extra={"component": "database"})
             database_health = False
             worker_health = {"ok": False, "error": "database_unavailable"}
-            listeners, sessions, recent_errors = [], {}, []
+            listeners, live_sources, sessions, recent_errors = [], [], {}, []
         return jsonify({
             "service": "interarcade-api",
             "version": config_class.GIT_VERSION,
@@ -458,6 +561,7 @@ def create_app(config_class=Config):
                 "worker": worker_health,
             },
             "listeners": listeners,
+            "live_sources": live_sources,
             "sessions": sessions,
             "recent_errors": recent_errors,
         })

@@ -1,4 +1,4 @@
-"""Standalone worker supervisor for TikTok listeners."""
+"""Standalone supervisor for session-bound live sources."""
 
 from __future__ import annotations
 
@@ -11,8 +11,9 @@ import urllib.request
 
 from ..config import Config
 from ..database import Database
-from ..events import event_from_tiktok
+from ..events import event_from_source
 from ..logging import configure_logging
+from .live_source import LiveSource, LiveSourceBinding
 from .tiktok import TikTokWorker
 
 
@@ -24,7 +25,7 @@ class WorkerService:
         configure_logging(config.LOG_LEVEL)
         self.database = Database(config.DATABASE_URL)
         self.database.initialize()
-        self.workers: dict[str, TikTokWorker] = {}
+        self.workers: dict[str, LiveSource] = {}
         self.stop_requested = False
         self.logger = logging.getLogger("interarcade.worker")
         self.worker_id = os.getenv("HOSTNAME", "interarcade-worker")
@@ -59,37 +60,56 @@ class WorkerService:
         raise RuntimeError(f"event delivery failed: {last_error}")
 
     def _start(self, row):
-        tenant_id = row["tenant_id"]
-        if tenant_id in self.workers and self.workers[tenant_id].should_run:
+        source_id = row["id"]
+        if source_id in self.workers and self.workers[source_id].should_run:
             return
-        session_id = row["session_id"]
+        binding = LiveSourceBinding.from_row(row)
+        if binding.platform != "tiktok":
+            raise ValueError(f"no live connector for platform {binding.platform}")
 
         def emit(event_type, actor, **payload):
-            self._post_event(event_from_tiktok(tenant_id, session_id, event_type, actor, **payload))
+            self._post_event(event_from_source(
+                binding.platform,
+                binding.tenant_id,
+                binding.session_id,
+                event_type,
+                actor,
+                source_account_id=binding.account_id,
+                source_username=binding.username,
+                **payload,
+            ))
 
         def stopped():
-            self.database.update_listener(tenant_id, "stopped")
-            self.workers.pop(tenant_id, None)
+            self.database.update_live_source(source_id, "stopped")
+            if self.workers.get(source_id) is worker:
+                self.workers.pop(source_id, None)
 
         worker = TikTokWorker(
-            row["username"], tenant_id, session_id, emit,
+            binding, emit,
             self.config.TIKTOK_SIGN_API_KEY, on_stopped=stopped,
         )
-        self.workers[tenant_id] = worker
-        self.database.update_listener(tenant_id, "running")
+        self.workers[source_id] = worker
+        self.database.update_live_source(source_id, "running")
         worker.start()
 
     def run_once(self):
-        for row in self.database.listeners():
+        for row in self.database.live_sources():
             try:
                 if row["status"] in {"starting", "running"}:
-                    self._start(row)
-                elif row["status"] == "stopping" and row["tenant_id"] in self.workers:
-                    self.workers[row["tenant_id"]].stop()
+                    session = self.database.session(row["session_id"])
+                    if session and session["status"] == "active":
+                        self._start(row)
+                    else:
+                        self.database.update_live_source(row["id"], "stopping")
+                elif row["status"] == "stopping":
+                    if row["id"] in self.workers:
+                        self.workers[row["id"]].stop()
+                    else:
+                        self.database.update_live_source(row["id"], "stopped")
             except Exception as exc:
-                self.database.update_listener(row["tenant_id"], "error", str(exc))
-                self.database.record_error("worker", str(exc), {"tenant_id": row["tenant_id"]})
-                self.logger.exception("listener startup failed")
+                self.database.update_live_source(row["id"], "error", str(exc))
+                self.database.record_error("worker", str(exc), {"source_id": row["id"]})
+                self.logger.exception("live source startup failed")
 
     def run_forever(self):
         signal.signal(signal.SIGTERM, self._request_stop)

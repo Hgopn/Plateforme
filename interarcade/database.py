@@ -60,12 +60,29 @@ SCHEMA = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS live_sources (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        platform TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        username TEXT NOT NULL,
+        status TEXT NOT NULL,
+        last_error TEXT,
+        started_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (session_id, platform, account_id)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS live_sources_session_idx ON live_sources (session_id, status)",
+    """
     CREATE TABLE IF NOT EXISTS event_outbox (
         event_id TEXT PRIMARY KEY,
         tenant_id TEXT NOT NULL,
         session_id TEXT NOT NULL,
         event_type TEXT NOT NULL,
         payload_json TEXT NOT NULL,
+        envelope_json TEXT,
         status TEXT NOT NULL DEFAULT 'accepted',
         attempts INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
@@ -207,6 +224,20 @@ class Database:
             for statement in SCHEMA:
                 cursor.execute(statement)
             if self.backend == "postgresql":
+                cursor.execute("ALTER TABLE event_outbox ADD COLUMN IF NOT EXISTS envelope_json TEXT")
+            else:
+                cursor.execute("PRAGMA table_info(event_outbox)")
+                if "envelope_json" not in {row[1] for row in cursor.fetchall()}:
+                    cursor.execute("ALTER TABLE event_outbox ADD COLUMN envelope_json TEXT")
+            # Additive migration: keep the legacy table and copy its last state.
+            cursor.execute(
+                "INSERT INTO live_sources (id, tenant_id, session_id, platform, account_id, username, "
+                "status, last_error, started_at, updated_at) "
+                "SELECT 'legacy:tiktok:' || tenant_id, tenant_id, session_id, 'tiktok', username, username, "
+                "status, last_error, COALESCE(started_at, updated_at), updated_at "
+                "FROM listeners WHERE session_id IS NOT NULL ON CONFLICT DO NOTHING"
+            )
+            if self.backend == "postgresql":
                 # PostgreSQL does not auto-increment an ``INTEGER PRIMARY KEY``.
                 # Keep the existing table compatible and give new rows a safe id.
                 cursor.execute("CREATE SEQUENCE IF NOT EXISTS runtime_errors_id_seq")
@@ -293,6 +324,14 @@ class Database:
                     "WHERE session_id = ? AND status = 'active'"
                 ),
                 (timestamp, timestamp, session_id),
+            )
+            cursor.execute(
+                self._sql(
+                    "UPDATE live_sources SET status = CASE WHEN status = 'simulated' THEN 'stopped' "
+                    "ELSE 'stopping' END, updated_at = ? WHERE session_id = ? "
+                    "AND status IN ('starting', 'running', 'simulated')"
+                ),
+                (timestamp, session_id),
             )
 
     def session(self, session_id: str):
@@ -410,9 +449,12 @@ class Database:
         with self.connection() as connection:
             cursor = connection.cursor()
             cursor.execute(self._sql(
-                "INSERT INTO event_outbox (event_id, tenant_id, session_id, event_type, payload_json, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(event_id) DO NOTHING"
-            ), (event["event_id"], event["tenant_id"], event["session_id"], event["type"], json.dumps(event.get("payload") or {}), now()))
+                "INSERT INTO event_outbox (event_id, tenant_id, session_id, event_type, payload_json, "
+                "envelope_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(event_id) DO NOTHING"
+            ), (
+                event["event_id"], event["tenant_id"], event["session_id"], event["type"],
+                json.dumps(event.get("payload") or {}), json.dumps(event), now(),
+            ))
             accepted = cursor.rowcount == 1
             query = "SELECT * FROM marble_rounds WHERE session_id = ? ORDER BY round_number DESC LIMIT 1"
             if self.backend == "postgresql":
@@ -433,33 +475,65 @@ class Database:
                 state["ended_at"] = ended_at
             return accepted, state
 
-    def save_listener(self, tenant_id: str, username: str, session_id: str, status: str):
-        timestamp = now()
-        if self.backend == "postgresql":
-            query = """INSERT INTO listeners (tenant_id, username, session_id, status, started_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (tenant_id) DO UPDATE SET username=EXCLUDED.username,
-                session_id=EXCLUDED.session_id, status=EXCLUDED.status, updated_at=EXCLUDED.updated_at"""
-        else:
-            query = """INSERT INTO listeners (tenant_id, username, session_id, status, started_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(tenant_id) DO UPDATE SET username=excluded.username,
-                session_id=excluded.session_id, status=excluded.status, updated_at=excluded.updated_at"""
-        self.execute(query, (tenant_id, username, session_id, status, timestamp, timestamp))
+    def live_source(self, source_id: str):
+        return self.fetchone("SELECT * FROM live_sources WHERE id = ?", (source_id,))
 
-    def update_listener(self, tenant_id: str, status: str, error: str | None = None):
-        self.execute(
-            "UPDATE listeners SET status = ?, last_error = ?, updated_at = ? WHERE tenant_id = ?",
-            (status, error, now(), tenant_id),
+    def live_source_for_session(self, session_id: str, platform: str, account_id: str):
+        return self.fetchone(
+            "SELECT * FROM live_sources WHERE session_id = ? AND platform = ? AND account_id = ?",
+            (session_id, platform, account_id),
         )
 
+    def live_sources(self, session_id: str | None = None):
+        if session_id is None:
+            return self.fetchall("SELECT * FROM live_sources ORDER BY updated_at DESC, id")
+        return self.fetchall(
+            "SELECT * FROM live_sources WHERE session_id = ? ORDER BY updated_at DESC, id", (session_id,)
+        )
+
+    def save_live_source(
+        self, source_id: str, tenant_id: str, session_id: str, platform: str,
+        account_id: str, username: str, status: str,
+    ):
+        timestamp = now()
+        self.execute(
+            "INSERT INTO live_sources (id, tenant_id, session_id, platform, account_id, username, "
+            "status, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET tenant_id=excluded.tenant_id, "
+            "session_id=excluded.session_id, platform=excluded.platform, "
+            "account_id=excluded.account_id, username=excluded.username, status=excluded.status, "
+            "last_error=NULL, updated_at=excluded.updated_at",
+            (source_id, tenant_id, session_id, platform, account_id, username, status, timestamp, timestamp),
+        )
+        return self.live_source(source_id)
+
+    def update_live_source(self, source_id: str, status: str, error: str | None = None):
+        self.execute(
+            "UPDATE live_sources SET status = ?, last_error = ?, updated_at = ? WHERE id = ?",
+            (status, error, now(), source_id),
+        )
+
+    def save_listener(self, tenant_id: str, username: str, session_id: str, status: str):
+        current = self.live_source_for_session(session_id, "tiktok", username)
+        return self.save_live_source(
+            current["id"] if current else f"legacy:tiktok:{tenant_id}:{session_id}",
+            tenant_id, session_id, "tiktok", username, username, status,
+        )
+
+    def update_listener(self, tenant_id: str, status: str, error: str | None = None):
+        source = next((row for row in self.listeners() if row["tenant_id"] == tenant_id), None)
+        if source:
+            self.update_live_source(source["id"], status, error)
+
     def listeners(self):
-        rows = self.fetchall("SELECT * FROM listeners ORDER BY tenant_id")
-        return rows
+        return [row for row in self.live_sources() if row["platform"] == "tiktok"]
 
     def record_event(self, event: dict):
         payload = json.dumps(event.get("payload") or {})
         return self.execute(
-            "INSERT INTO event_outbox (event_id, tenant_id, session_id, event_type, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(event_id) DO NOTHING",
-            (event["event_id"], event["tenant_id"], event["session_id"], event["type"], payload, now()),
+            "INSERT INTO event_outbox (event_id, tenant_id, session_id, event_type, payload_json, "
+            "envelope_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(event_id) DO NOTHING",
+            (event["event_id"], event["tenant_id"], event["session_id"], event["type"], payload, json.dumps(event), now()),
         )
 
     def heartbeat_worker(self, worker_id: str, pid: int | None = None):

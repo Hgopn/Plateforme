@@ -8,6 +8,10 @@
 6. Open a game with the returned `session_id` and `token` query parameters.
 7. Start or stop a TikTok listener with `Authorization: Bearer <INTERARCADE_ADMIN_TOKEN>`.
 
+The Live Hub source model and local multi-source simulation are documented in
+[LIVE_HUB.md](LIVE_HUB.md). Simulated sources require Demo mode and never
+connect to TikTok or Twitch.
+
 The existing game pages remain static files under `/games/<game>/<game>.html`.
 Socket.IO accepts only signed tokens for active persisted sessions. Connections
 join a session-specific room so simultaneous games from one tenant are isolated.
