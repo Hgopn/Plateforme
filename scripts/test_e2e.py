@@ -73,6 +73,22 @@ def journey():
             raise RuntimeError(f"launcher asset did not load: {asset} ({status})")
 
     dark = create_demo_session("dark")
+    status, dark_started = request(
+        f"/api/v1/sessions/{dark['session_id']}/games/dark/start",
+        "POST",
+        {},
+        auth(dark),
+    )
+    if status != 201 or dark_started.get("state", {}).get("map", {}).get("width") != 10:
+        raise RuntimeError(f"Dark level one did not start: {status} {dark_started}")
+    status, collision = request(
+        f"/api/v1/sessions/{dark['session_id']}/games/dark/move",
+        "POST",
+        {"direction": "up"},
+        auth(dark),
+    )
+    if status != 200 or not collision.get("outcome", {}).get("collision"):
+        raise RuntimeError(f"Dark collision was not enforced: {status} {collision}")
     dark_events = []
     dark_ready = threading.Event()
     dark_socket = socketio.Client()
@@ -99,8 +115,16 @@ def journey():
         time.sleep(0.05)
     if status != 202 or len(dark_events) != 1:
         raise RuntimeError(f"Dark did not receive its simulated event: {status} {dark_events}")
+    if dark_events[0].get("source") != "test":
+        raise RuntimeError(f"Dark did not receive a normalized Test event: {dark_events}")
     dark_socket.disconnect()
     close_session(dark)
+    status, closed_dark = request(
+        f"/api/v1/sessions/{dark['session_id']}/games/dark/state",
+        headers=auth(dark),
+    )
+    if status != 200 or closed_dark.get("state", {}).get("status") != "ended":
+        raise RuntimeError(f"Dark run stayed active after session closure: {status} {closed_dark}")
 
     marble = create_demo_session("marble")
     status, started = request(
@@ -145,7 +169,14 @@ def journey():
         encoding="utf-8",
     )
     STATE_FILE.chmod(0o600)
-    print(json.dumps({"status": "ok", "phase": "journey", "dark_events": len(dark_events), "marble_winner": round_state["winner"]}))
+    print(json.dumps({
+        "status": "ok",
+        "phase": "journey",
+        "dark_level": dark_started["state"]["level"],
+        "dark_collision": True,
+        "dark_events": len(dark_events),
+        "marble_winner": round_state["winner"],
+    }))
 
 
 def verify():

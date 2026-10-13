@@ -14,7 +14,7 @@ from .auth import issue_token, verify_token
 from .broker import Broker
 from .config import Config
 from .database import Database
-from .events import event_from_tiktok
+from .events import event_from_source
 from .logging import configure_logging
 
 
@@ -67,6 +67,23 @@ def create_app(config_class=Config):
                 {"schema_version": 1, "game_id": "marble", "session_id": session_id, "state": state},
                 to=f"session:{session_id}",
             )
+
+    def publish_dark_state(session_id, state, outcome=None):
+        if not state:
+            return
+        from .games.dark import public_state
+
+        socketio.emit(
+            "ia:game_state",
+            {
+                "schema_version": 1,
+                "game_id": "dark",
+                "session_id": session_id,
+                "state": public_state(state),
+                "outcome": outcome,
+            },
+            to=f"session:{session_id}",
+        )
 
     def process_event(event):
         session = database.session(event.session_id)
@@ -198,6 +215,79 @@ def create_app(config_class=Config):
             return jsonify({"error": "unauthorized_or_wrong_game"}), 401
         return jsonify({"schema_version": 1, "game_id": "marble", "session_id": session_id, "state": database.marble_round(session_id)})
 
+    @app.post("/api/v1/sessions/<session_id>/games/dark/start")
+    def start_dark_run(session_id):
+        session = authorized_session(session_id)
+        if not session or session.get("status") != "active" or session.get("game_id") != "dark":
+            return jsonify({"error": "unauthorized_or_wrong_game"}), 401
+        state = database.start_dark_run(secrets.token_urlsafe(18), session_id)
+        from .games.dark import public_state
+
+        publish_dark_state(session_id, state)
+        return jsonify({
+            "schema_version": 1,
+            "game_id": "dark",
+            "session_id": session_id,
+            "state": public_state(state),
+        }), 201
+
+    @app.get("/api/v1/sessions/<session_id>/games/dark/state")
+    def dark_state(session_id):
+        session = authorized_session(session_id)
+        if not session or session.get("game_id") != "dark":
+            return jsonify({"error": "unauthorized_or_wrong_game"}), 401
+        from .games.dark import public_state
+
+        return jsonify({
+            "schema_version": 1,
+            "game_id": "dark",
+            "session_id": session_id,
+            "state": public_state(database.dark_run(session_id)),
+        })
+
+    @app.post("/api/v1/sessions/<session_id>/games/dark/move")
+    def move_dark(session_id):
+        session = authorized_session(session_id)
+        if not session or session.get("status") != "active" or session.get("game_id") != "dark":
+            return jsonify({"error": "unauthorized_or_wrong_game"}), 401
+        direction = (request.get_json(silent=True) or {}).get("direction")
+        if not isinstance(direction, str):
+            return jsonify({"error": "invalid_direction"}), 400
+        try:
+            state, outcome = database.move_dark(session_id, direction)
+        except ValueError:
+            return jsonify({"error": "invalid_direction"}), 400
+        if not state:
+            return jsonify({"error": "dark_not_started"}), 409
+        from .games.dark import public_state
+
+        publish_dark_state(session_id, state, outcome)
+        return jsonify({
+            "schema_version": 1,
+            "game_id": "dark",
+            "session_id": session_id,
+            "state": public_state(state),
+            "outcome": outcome,
+        })
+
+    @app.post("/api/v1/sessions/<session_id>/games/dark/reset")
+    def reset_dark(session_id):
+        session = authorized_session(session_id)
+        if not session or session.get("status") != "active" or session.get("game_id") != "dark":
+            return jsonify({"error": "unauthorized_or_wrong_game"}), 401
+        state = database.start_dark_run(secrets.token_urlsafe(18), session_id, reset=True)
+        from .games.dark import public_state
+
+        outcome = {"moved": False, "collision": False, "transition": {"type": "reset"}}
+        publish_dark_state(session_id, state, outcome)
+        return jsonify({
+            "schema_version": 1,
+            "game_id": "dark",
+            "session_id": session_id,
+            "state": public_state(state),
+            "outcome": outcome,
+        })
+
     @app.post("/api/v1/sessions/<session_id>/end")
     def end_session(session_id):
         if not authorized_session(session_id):
@@ -258,7 +348,8 @@ def create_app(config_class=Config):
         if not isinstance(payload, dict):
             return jsonify({"error": "invalid_event_payload"}), 400
         try:
-            event = event_from_tiktok(
+            event = event_from_source(
+                data.get("source", "tiktok"),
                 data["tenant_id"],
                 data["session_id"],
                 data["type"],
@@ -323,7 +414,8 @@ def create_app(config_class=Config):
         if not all(isinstance(value, str) and value.strip() for value in required) or not isinstance(payload, dict):
             return jsonify({"error": "invalid_event"}), 400
         try:
-            event = event_from_tiktok(
+            event = event_from_source(
+                "test",
                 config_class.DEMO_TENANT_ID,
                 session_id,
                 data["type"],

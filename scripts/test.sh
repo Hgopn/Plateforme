@@ -7,5 +7,6 @@ docker compose --env-file .env.integration -f deploy/docker-compose.integration.
 docker compose --env-file .env.integration -f deploy/docker-compose.integration.yml exec -T api \
   python -m scripts.test_flow
 for file in games/*/*.js; do node --check "$file"; done
+node tests/test_dark_client.js
 git diff --check
 echo "InterArcade integration tests passed"

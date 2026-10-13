@@ -1,4 +1,4 @@
-"""Return a compact JSON runtime state for a future EKA observer."""
+"""Return a compact JSON state for the InterArcade runtime observer."""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ import urllib.request
 
 
 def get(path: str, token: str | None = None):
-    request = urllib.request.Request(f"{os.getenv('INTERARCADE_API_URL', 'http://127.0.0.1:15000')}{path}")
+    default_api = f"http://{os.getenv('INTERARCADE_BIND_HOST', '127.0.0.1')}:15000"
+    api_url = os.getenv("INTERARCADE_MONITOR_API", default_api)
+    request = urllib.request.Request(f"{api_url}{path}")
     if token:
         request.add_header("Authorization", f"Bearer {token}")
     try:

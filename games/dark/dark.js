@@ -1,378 +1,409 @@
+"use strict";
+
+const params = new URLSearchParams(window.location.search);
+const SESSION_ID = params.get("session_id") || "";
+const TOKEN = params.get("token") || "";
+const canvas = document.getElementById("game-canvas");
+const context = canvas.getContext("2d");
+const lightCanvas = document.createElement("canvas");
+const lightContext = lightCanvas.getContext("2d");
+const viewport = document.getElementById("viewport");
+const levelLabel = document.getElementById("level-label");
+const sessionState = document.getElementById("session-state");
+const objectiveText = document.getElementById("objective-text");
+const moveCount = document.getElementById("move-count");
+const message = document.getElementById("message");
+const errorPanel = document.getElementById("error-panel");
+// Visual tuning only; the server still decides which grid steps are valid.
+const DARK_VISUALS = Object.freeze({
+  lightRadiusTiles: 1.25,
+  moveSpeedCellsPerSecond: 8,
+});
+const playerSprites = Object.fromEntries(["down", "up", "left", "right"].map((direction) => {
+  const sprite = new Image();
+  sprite.src = `assets/player_${direction}.png`;
+  return [direction, sprite];
+}));
+
+let state = null;
 let socket = null;
-const urlParams = new URLSearchParams(window.location.search);
-const SOCKET_URL = window.location.origin;
+let movePending = false;
+let facing = "down";
+let visualPlayer = { x: 1, y: 1 };
+let visualWaypoints = [];
+let walkPhase = 0;
+let messageTimer = null;
+let lastFrame = performance.now();
+let heldDirection = null;
+let holdCanRepeat = false;
 
-// Connexion Socket.IO
-try {
-  socket = io(SOCKET_URL, {
-    transports: ["websocket"],
-    auth: { token: urlParams.get("token") || "" }
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${TOKEN}`,
+      ...(options.headers || {}),
+    },
   });
-
-  socket.on("connect", () => {
-    console.log("[DARK] Socket.IO connecté");
-  });
-
-  socket.on("disconnect", () => {
-    console.warn("[DARK] Socket.IO déconnecté");
-  });
-
-  // 🎁 Réception des événements TikTok
-  socket.on("ia:event", (data) => {
-    const event = data?.payload || data;
-    if (data && data.type === "gift") onGiftEvent(event);
-    if (data && data.type === "like") onLikeEvent(event);
-  });
-
-} catch (err) {
-  console.error("[DARK] Erreur Socket.IO :", err);
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+  return body;
 }
 
-
-// ==================================
-// 🔥 Lumière & tremblements
-// ==================================
-let baseLightRadius = 0.9;        // plus petit = plus difficile
-let currentLightRadius = baseLightRadius;
-let shakeIntensity = 2;
-
-// ==================================
-// 🔥 AJOUT — Niveau affiché en haut
-// ==================================
-let currentLevel = 0;
-function updateLevelDisplay() {
-  const el = document.getElementById("level-display");
-  if (el) el.textContent = "LEVEL " + (currentLevel + 1);
+function showError(text) {
+  errorPanel.textContent = text;
+  errorPanel.classList.remove("hidden");
+  sessionState.textContent = "Session indisponible";
 }
 
-// ========================
-// 🧩 NIVEAUX
-// 0 = mur, 1 = chemin, 2 = sortie, 3 = spawn
-// ========================
-const LEVELS = [
-
-  // LEVEL 1 — 10×10
-  [
-    [1,1,1,1,1,1,1,1,1,1],
-    [1,3,0,0,0,1,0,0,0,1],
-    [1,0,1,1,0,1,0,1,0,1],
-    [1,0,1,0,0,0,0,1,0,1],
-    [1,0,1,0,1,1,0,0,0,1],
-    [1,0,0,0,0,1,1,1,0,1],
-    [1,1,1,1,0,0,0,1,0,1],
-    [1,0,0,1,0,1,0,1,0,1],
-    [1,0,0,0,0,1,0,0,2,1],
-    [1,1,1,1,1,1,1,1,1,1],
-  ],
-
-  // LEVEL 2 — 15×15
-  [
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,3,0,0,1,0,0,0,1,0,0,0,0,0,1],
-    [1,0,1,0,1,0,1,0,1,0,1,1,1,0,1],
-    [1,0,1,0,0,0,1,0,0,0,0,0,1,0,1],
-    [1,0,1,1,1,0,1,1,1,1,1,0,1,0,1],
-    [1,0,0,0,1,0,0,0,0,1,0,0,1,0,1],
-    [1,1,1,0,1,1,1,1,0,1,1,0,1,0,1],
-    [1,0,0,0,0,0,0,1,0,0,0,0,1,0,1],
-    [1,0,1,1,1,1,0,1,1,1,1,0,1,0,1],
-    [1,0,1,0,0,0,0,0,0,0,1,0,1,0,1],
-    [1,0,1,0,1,1,1,1,1,0,1,0,1,0,1],
-    [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
-    [1,1,1,0,1,0,1,0,1,1,1,0,1,0,1],
-    [1,0,0,0,0,0,1,0,0,0,1,0,0,2,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-  ],
-
-  // LEVEL 3 — 15×15 (simple)
-  [
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,3,0,0,0,0,1,0,0,0,1,0,0,0,1],
-    [1,0,1,1,1,0,1,0,1,0,1,0,1,0,1],
-    [1,0,1,0,0,0,1,0,1,0,1,0,1,0,1],
-    [1,0,1,0,1,1,1,0,1,0,1,0,1,0,1],
-    [1,0,0,0,0,0,0,0,1,0,0,0,0,0,1],
-    [1,1,1,1,1,1,0,1,1,1,1,1,1,0,1],
-    [1,0,0,0,0,0,0,1,0,0,0,1,0,0,1],
-    [1,0,1,1,1,1,0,1,1,1,0,1,1,0,1],
-    [1,0,1,0,0,0,0,0,0,1,0,0,1,0,1],
-    [1,0,1,0,1,1,1,1,0,1,1,0,1,0,1],
-    [1,0,0,0,1,0,0,0,1,0,0,0,1,0,1],
-    [1,1,1,0,1,1,1,0,1,1,1,0,1,0,1],
-    [1,0,0,0,0,0,0,0,0,0,1,0,0,2,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-  ]
-
-];
-
-let map = LEVELS[0];
-
-// ✅ player avec direction
-let player = { x: 1, y: 1, dir: "down" };
-
-let tileSize = 50;
-
-
-// ==================================
-// ✅ CHARGEMENT DES IMAGES (assets)
-// ==================================
-const playerImages = {
-  up: new Image(),
-  down: new Image(),
-  left: new Image(),
-  right: new Image()
-};
-
-playerImages.up.src = "assets/player_up.png";
-playerImages.down.src = "assets/player_down.png";
-playerImages.left.src = "assets/player_left.png";
-playerImages.right.src = "assets/player_right.png";
-
-
-// ========================
-// 🧱 LABYRINTHE (DOM)
-// ========================
-const mazeEl = document.getElementById("maze");
-
-function applyGridSize() {
-  const rows = map.length;
-  const cols = map[0].length;
-  tileSize = 500 / cols;
-  mazeEl.style.gridTemplateColumns = `repeat(${cols}, ${tileSize}px)`;
-  mazeEl.style.gridTemplateRows = `repeat(${rows}, ${tileSize}px)`;
+function showMessage(kicker, title, detail, duration = 1700) {
+  window.clearTimeout(messageTimer);
+  message.querySelector(".message-kicker").textContent = kicker;
+  message.querySelector("strong").textContent = title;
+  message.querySelector("small").textContent = detail;
+  message.classList.add("visible");
+  if (duration) {
+    messageTimer = window.setTimeout(() => message.classList.remove("visible"), duration);
+  }
 }
 
-function renderMaze() {
-  mazeEl.innerHTML = "";
-  applyGridSize();
-
-  map.forEach(row => {
-    row.forEach(cell => {
-      const div = document.createElement("div");
-      div.className = "cell " + (cell === 0 ? "wall" : "path");
-
-      if (cell === 2) {
-        div.style.background = "#FFD700";
-        div.style.border = "2px solid white";
-      }
-
-      mazeEl.appendChild(div);
-    });
-  });
-}
-
-function initPlayerFromSpawn() {
-  for (let y = 0; y < map.length; y++) {
-    for (let x = 0; x < map[0].length; x++) {
-      if (map[y][x] === 3) {
-        player.x = x;
-        player.y = y;
-        return;
-      }
+function setState(nextState, outcome = null, snap = false) {
+  if (!nextState) return;
+  const previous = state;
+  const resetTransition = outcome?.transition?.type === "reset";
+  if (previous && !snap && !resetTransition && previous.level === nextState.level
+      && nextState.moves < previous.moves) return;
+  const duplicate = state
+    && state.level === nextState.level
+    && state.moves === nextState.moves
+    && state.status === nextState.status;
+  const changedLevel = state && state.level !== nextState.level;
+  state = nextState;
+  if (changedLevel || resetTransition) stopHolding();
+  if (snap || changedLevel || resetTransition) {
+    visualWaypoints = [];
+    visualPlayer = { ...nextState.player };
+    walkPhase = 0;
+  } else if (!duplicate && previous && nextState.moves > previous.moves) {
+    const stepDistance = Math.abs(nextState.player.x - previous.player.x)
+      + Math.abs(nextState.player.y - previous.player.y);
+    if (stepDistance === 1) visualWaypoints.push({ ...nextState.player });
+    else {
+      visualWaypoints = [];
+      visualPlayer = { ...nextState.player };
     }
   }
+  levelLabel.textContent = `Niveau ${nextState.level} / ${nextState.level_count}`;
+  moveCount.textContent = `${nextState.moves} pas`;
+  sessionState.textContent = nextState.status === "finished" ? "Parcours terminé" : "Session active";
+  objectiveText.textContent = nextState.status === "finished"
+    ? "Les trois sorties ont été trouvées."
+    : "Cherchez l’escalier dans l’obscurité.";
+
+  const transition = duplicate ? null : outcome?.transition;
+  if (transition?.type === "level_complete") {
+    showMessage("NIVEAU TERMINÉ", `Entrée dans la zone ${transition.next_level}`, "La grotte s’étend. Trouvez le prochain escalier.");
+  } else if (transition?.type === "game_complete") {
+    showMessage("PARCOURS TERMINÉ", "Vous avez retrouvé la sortie", "Les trois niveaux de Dark sont terminés.", 0);
+  } else if (transition?.type === "reset") {
+    showMessage("NOUVEAU PARCOURS", "Retour au niveau 1", "La progression de cette session a été réinitialisée.");
+  }
 }
 
-renderMaze();
-initPlayerFromSpawn();
-updateLevelDisplay();
-
-
-// ========================
-// 🌑 CANVAS + LUMIÈRE
-// ========================
-const canvas = document.createElement("canvas");
-canvas.width = 500;
-canvas.height = 500;
-canvas.style.position = "absolute";
-canvas.style.zIndex = "3";
-canvas.style.pointerEvents = "none";
-document.getElementById("game-container").appendChild(canvas);
-
-const ctx = canvas.getContext("2d");
-
-// ✅ FIX: plus de carré blanc (aucun fallback)
-function drawPlayer() {
-  const img = playerImages[player.dir];
-  if (!img || !img.complete) return; // on attend que l'image soit chargée
-
-  const px = player.x * tileSize;
-  const py = player.y * tileSize;
-
-  const size = tileSize * 0.8;
-  const offset = (tileSize - size) / 2;
-
-  ctx.save();
-  ctx.globalCompositeOperation = "source-over";
-  ctx.imageSmoothingEnabled = true;
-
-  ctx.drawImage(img, px + offset, py + offset, size, size);
-
-  ctx.restore();
+function resizeCanvas() {
+  const rect = viewport.getBoundingClientRect();
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+  canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+  lightCanvas.width = canvas.width;
+  lightCanvas.height = canvas.height;
+  canvas.style.width = `${rect.width}px`;
+  canvas.style.height = `${rect.height}px`;
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  lightContext.setTransform(ratio, 0, 0, ratio, 0, 0);
 }
 
-function drawLight() {
-  ctx.clearRect(0, 0, 500, 500);
-
-  ctx.globalCompositeOperation = "source-over";
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, 500, 500);
-
-  let cx = player.x * tileSize + tileSize / 2;
-  let cy = player.y * tileSize + tileSize / 2;
-
-  cx += (Math.random() - 0.5) * shakeIntensity;
-  cy += (Math.random() - 0.5) * shakeIntensity;
-
-  const radius = tileSize * currentLightRadius;
-
-  ctx.globalCompositeOperation = "destination-out";
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ✅ sécurité: on revient bien en source-over avant de dessiner le perso
-  ctx.globalCompositeOperation = "source-over";
-  drawPlayer();
+function caveNoise(x, y) {
+  return Math.abs(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1;
 }
 
-setInterval(drawLight, 50);
+function drawWall(screenX, screenY, tile, x, y) {
+  const shade = 22 + Math.floor(caveNoise(x, y) * 10);
+  context.fillStyle = `rgb(${shade - 4}, ${shade + 4}, ${shade})`;
+  context.fillRect(screenX, screenY, tile + 1, tile + 1);
+  context.strokeStyle = "rgba(130, 151, 137, .09)";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(screenX + tile * .12, screenY + tile * .28);
+  context.lineTo(screenX + tile * .52, screenY + tile * .18);
+  context.lineTo(screenX + tile * .84, screenY + tile * .36);
+  context.stroke();
+  context.fillStyle = "rgba(0, 0, 0, .22)";
+  context.fillRect(screenX, screenY + tile * .82, tile, tile * .18);
+}
 
+function drawFloor(screenX, screenY, tile, x, y) {
+  const shade = 11 + Math.floor(caveNoise(x, y) * 5);
+  context.fillStyle = `rgb(${shade - 2}, ${shade + 3}, ${shade})`;
+  context.fillRect(screenX, screenY, tile + 1, tile + 1);
+  if (caveNoise(y + 9, x + 4) > .68) {
+    context.fillStyle = "rgba(133, 159, 139, .12)";
+    context.beginPath();
+    context.arc(screenX + tile * .3, screenY + tile * .62, tile * .035, 0, Math.PI * 2);
+    context.fill();
+  }
+}
 
-// ========================
-// 🎮 PASSAGE DE NIVEAU
-// ========================
-function nextLevel() {
-  currentLevel++;
+function drawExit(screenX, screenY, tile) {
+  context.save();
+  context.translate(screenX + tile / 2, screenY + tile / 2);
+  context.fillStyle = "#859481";
+  context.strokeStyle = "#c0ceb8";
+  context.lineWidth = Math.max(1, tile * .025);
+  for (let step = 0; step < 5; step += 1) {
+    const width = tile * (.65 - step * .085);
+    const y = tile * (.25 - step * .105);
+    context.fillRect(-width / 2, y, width, tile * .085);
+    context.strokeRect(-width / 2, y, width, tile * .085);
+  }
+  context.restore();
+}
 
-  if (!LEVELS[currentLevel]) {
-    alert("🎉 Tous les niveaux terminés !");
+function drawPlayer(centerX, centerY, tile, direction, walking) {
+  const sprite = playerSprites[direction];
+  const size = tile * .8;
+  const stride = walking ? Math.sin(walkPhase) : 0;
+  const bob = walking ? Math.abs(stride) * tile * .055 : 0;
+  context.save();
+  context.translate(centerX, centerY);
+  context.fillStyle = "rgba(0, 0, 0, .55)";
+  context.beginPath();
+  context.ellipse(0, tile * .24, tile * .2, tile * .065, 0, 0, Math.PI * 2);
+  context.fill();
+  context.translate(stride * tile * .035, -bob);
+  context.rotate(stride * .09);
+  if (sprite.complete && sprite.naturalWidth) {
+    context.drawImage(sprite, -size / 2, -size * .55, size, size);
+  } else {
+    context.fillStyle = "#d7ddd3";
+    context.beginPath();
+    context.ellipse(0, 0, tile * .2, tile * .27, 0, 0, Math.PI * 2);
+    context.fill();
+  }
+  if (walking) {
+    context.fillStyle = "#382319";
+    for (const side of [-1, 1]) {
+      const step = side * stride * tile * .045;
+      const sideView = direction === "left" || direction === "right";
+      const footX = side * tile * .065 + (sideView ? step : 0);
+      const footY = tile * .21 + (sideView ? 0 : step);
+      context.beginPath();
+      context.ellipse(footX, footY, tile * .041, tile * .025, 0, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+  context.restore();
+}
+
+function advanceVisualPlayer(delta) {
+  let remaining = DARK_VISUALS.moveSpeedCellsPerSecond * delta / 1000;
+  let travelled = 0;
+  let direction = facing;
+  while (remaining > 0 && visualWaypoints.length) {
+    const next = visualWaypoints[0];
+    const dx = next.x - visualPlayer.x;
+    const dy = next.y - visualPlayer.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < .00001) {
+      visualPlayer = visualWaypoints.shift();
+      continue;
+    }
+    direction = Math.abs(dx) > Math.abs(dy)
+      ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+    const step = Math.min(remaining, distance);
+    visualPlayer.x += dx / distance * step;
+    visualPlayer.y += dy / distance * step;
+    travelled += step;
+    remaining -= step;
+    if (step >= distance - .00001) visualPlayer = visualWaypoints.shift();
+  }
+  if (travelled) walkPhase += travelled * Math.PI * 1.3;
+  return { walking: travelled > 0, direction };
+}
+
+function render(time) {
+  const delta = Math.min(32, time - lastFrame);
+  lastFrame = time;
+  const motion = advanceVisualPlayer(Math.max(0, delta));
+  if (heldDirection && holdCanRepeat && !movePending && !visualWaypoints.length) {
+    move(heldDirection);
+  }
+
+  const width = viewport.clientWidth;
+  const height = viewport.clientHeight;
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "#020403";
+  context.fillRect(0, 0, width, height);
+  if (!state) {
+    requestAnimationFrame(render);
     return;
   }
 
-  map = LEVELS[currentLevel];
-  renderMaze();
-  initPlayerFromSpawn();
-  updateLevelDisplay();
+  const tile = Math.max(46, Math.min(64, Math.floor(Math.min(width, height) / 6.1)));
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const offsetX = centerX - (visualPlayer.x + .5) * tile;
+  const offsetY = centerY - (visualPlayer.y + .5) * tile;
+  state.map.tiles.forEach((row, y) => {
+    [...row].forEach((cell, x) => {
+      const screenX = offsetX + x * tile;
+      const screenY = offsetY + y * tile;
+      if (screenX > width || screenY > height || screenX + tile < 0 || screenY + tile < 0) return;
+      if (cell === "#") drawWall(screenX, screenY, tile, x, y);
+      else drawFloor(screenX, screenY, tile, x, y);
+      if (cell === "E") drawExit(screenX, screenY, tile);
+    });
+  });
+
+  const flicker = Math.sin(time * .0067) * 2.5 + Math.sin(time * .017) * 1.2;
+  const lightRadius = tile * DARK_VISUALS.lightRadiusTiles + flicker;
+  lightContext.clearRect(0, 0, width, height);
+  lightContext.save();
+  lightContext.fillStyle = "rgba(0, 2, 1, .965)";
+  lightContext.fillRect(0, 0, width, height);
+  lightContext.globalCompositeOperation = "destination-out";
+  const light = lightContext.createRadialGradient(centerX, centerY, tile * .18, centerX, centerY, lightRadius);
+  light.addColorStop(0, "rgba(0, 0, 0, 1)");
+  light.addColorStop(.54, "rgba(0, 0, 0, .82)");
+  light.addColorStop(1, "rgba(0, 0, 0, 0)");
+  lightContext.fillStyle = light;
+  lightContext.beginPath();
+  lightContext.arc(centerX, centerY, lightRadius, 0, Math.PI * 2);
+  lightContext.fill();
+  lightContext.restore();
+  context.drawImage(lightCanvas, 0, 0, width, height);
+  drawPlayer(centerX, centerY, tile, motion.direction, motion.walking);
+  requestAnimationFrame(render);
 }
 
+async function move(direction) {
+  if (movePending || visualWaypoints.length || !state || state.status !== "active") return;
+  facing = direction;
+  movePending = true;
+  try {
+    const result = await api(`/api/v1/sessions/${encodeURIComponent(SESSION_ID)}/games/dark/move`, {
+      method: "POST",
+      body: JSON.stringify({ direction }),
+    });
+    setState(result.state, result.outcome);
+    if (!result.outcome?.moved || result.outcome.transition) holdCanRepeat = false;
+  } catch (error) {
+    holdCanRepeat = false;
+    showError(`Déplacement impossible : ${error.message}`);
+  } finally {
+    movePending = false;
+  }
+}
 
-// ========================
-// 🎮 DÉPLACEMENT
-// ========================
-function move(dx, dy) {
-  // ✅ direction AVANT de bouger
-  if (dx === 1) player.dir = "right";
-  if (dx === -1) player.dir = "left";
-  if (dy === 1) player.dir = "down";
-  if (dy === -1) player.dir = "up";
+async function reset() {
+  if (!state || movePending) return;
+  stopHolding();
+  movePending = true;
+  try {
+    const result = await api(`/api/v1/sessions/${encodeURIComponent(SESSION_ID)}/games/dark/reset`, {
+      method: "POST",
+      body: "{}",
+    });
+    setState(result.state, result.outcome, true);
+  } catch (error) {
+    showError(`Reset impossible : ${error.message}`);
+  } finally {
+    movePending = false;
+  }
+}
 
-  const nx = player.x + dx;
-  const ny = player.y + dy;
+function connectEvents() {
+  socket = io(window.location.origin, { transports: ["websocket"], auth: { token: TOKEN } });
+  socket.on("connect", () => { sessionState.textContent = "Session active"; });
+  socket.on("disconnect", () => { sessionState.textContent = "Reconnexion…"; });
+  socket.on("ia:game_state", (messageState) => {
+    if (messageState?.game_id === "dark" && messageState.session_id === SESSION_ID) {
+      setState(messageState.state, messageState.outcome);
+    }
+  });
+  socket.on("ia:event", (event) => {
+    window.dispatchEvent(new CustomEvent("interarcade:event", { detail: event }));
+    sessionState.textContent = "Événement reçu";
+    window.setTimeout(() => {
+      if (state?.status === "active") sessionState.textContent = "Session active";
+    }, 900);
+  });
+}
 
-  if (ny < 0 || ny >= map.length) return;
-  if (nx < 0 || nx >= map[0].length) return;
-
-  const cell = map[ny][nx];
-
-  if (cell === 0) return;
-
-  if (cell === 2) {
-    nextLevel();
+async function start() {
+  if (!SESSION_ID || !TOKEN) {
+    showError("Ouvrez Dark depuis le launcher InterArcade pour créer une session.");
     return;
   }
-
-  player.x = nx;
-  player.y = ny;
+  try {
+    connectEvents();
+    const result = await api(`/api/v1/sessions/${encodeURIComponent(SESSION_ID)}/games/dark/start`, {
+      method: "POST",
+      body: "{}",
+    });
+    setState(result.state, null, true);
+    window.setTimeout(() => message.classList.remove("visible"), 2300);
+  } catch (error) {
+    showError(`Dark ne peut pas démarrer : ${error.message}`);
+  }
 }
 
-document.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp") move(0, -1);
-  if (e.key === "ArrowDown") move(0, 1);
-  if (e.key === "ArrowLeft") move(-1, 0);
-  if (e.key === "ArrowRight") move(1, 0);
+const keyDirections = {
+  ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+  w: "up", z: "up", s: "down", a: "left", q: "left", d: "right",
+};
+
+function stopHolding(direction = heldDirection) {
+  if (heldDirection !== direction) return;
+  heldDirection = null;
+  holdCanRepeat = false;
+}
+
+function startHolding(direction) {
+  if (heldDirection === direction) return;
+  stopHolding();
+  heldDirection = direction;
+  holdCanRepeat = true;
+  move(direction);
+}
+
+document.addEventListener("keydown", (event) => {
+  const direction = keyDirections[event.key] || keyDirections[event.key.toLowerCase()];
+  if (!direction) return;
+  event.preventDefault();
+  if (event.repeat && heldDirection === direction) return;
+  startHolding(direction);
 });
-
-document.querySelectorAll("#controls button").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const dir = btn.dataset.dir;
-    if (dir === "up") move(0, -1);
-    if (dir === "down") move(0, 1);
-    if (dir === "left") move(-1, 0);
-    if (dir === "right") move(1, 0);
+document.addEventListener("keyup", (event) => {
+  const direction = keyDirections[event.key] || keyDirections[event.key.toLowerCase()];
+  if (direction) stopHolding(direction);
+});
+document.querySelectorAll("[data-direction]").forEach((button) => {
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    button.setPointerCapture(event.pointerId);
+    startHolding(button.dataset.direction);
+  });
+  button.addEventListener("pointerup", () => stopHolding(button.dataset.direction));
+  button.addEventListener("pointercancel", () => stopHolding(button.dataset.direction));
+  button.addEventListener("click", (event) => {
+    if (event.detail === 0) move(button.dataset.direction);
   });
 });
-
-
-// ==================================
-// 🎁 EFFETS DES CADEAUX
-// ==================================
-function onGiftEvent(event) {
-  const gift = event.gift?.toLowerCase() || "";
-  const count = event.count || 1;
-
-  console.log("🎁 Cadeau :", gift, "x" + count);
-
-  // Rose → +10% lumière 1 sec
-  if (gift.includes("rose")) {
-    radiusTemporaryBoost(0.10, 1000);
-  }
-
-  // Pistolet → flash
-  if (gift.includes("pistolet")) {
-    flashScreen();
-  }
-
-  // Tous les cadeaux → petit boost court
-  radiusTemporaryBoost(0.05 * count, 600);
-}
-
-
-// ==================================
-// ❤️ EFFETS DES LIKES
-// ==================================
-function onLikeEvent(event) {
-  console.log("❤️ Like reçu :", event.count);
-  shakeTemporaryBoost(3, 700);
-}
-
-
-// ==================================
-// 🔆 BOOSTS GÉNÉRIQUES
-// ==================================
-function radiusTemporaryBoost(percent, duration) {
-  currentLightRadius = baseLightRadius + percent;
-  setTimeout(() => {
-    currentLightRadius = baseLightRadius;
-  }, duration);
-}
-
-function shakeTemporaryBoost(level, duration) {
-  shakeIntensity = level;
-  setTimeout(() => {
-    shakeIntensity = 2;
-  }, duration);
-}
-
-
-// ==================================
-// ⚡ FLASH ÉCRAN
-// ==================================
-function flashScreen() {
-  const flash = document.createElement("div");
-  flash.style.position = "absolute";
-  flash.style.top = "0";
-  flash.style.left = "0";
-  flash.style.width = "500px";
-  flash.style.height = "500px";
-  flash.style.background = "white";
-  flash.style.opacity = "1";
-  flash.style.zIndex = "10";
-  flash.style.transition = "opacity 0.3s";
-  document.getElementById("game-container").appendChild(flash);
-
-  setTimeout(() => {
-    flash.style.opacity = "0";
-    setTimeout(() => flash.remove(), 300);
-  }, 50);
-}
+document.getElementById("reset-button").addEventListener("click", reset);
+window.addEventListener("resize", resizeCanvas);
+window.addEventListener("blur", () => stopHolding());
+resizeCanvas();
+requestAnimationFrame(render);
+start();

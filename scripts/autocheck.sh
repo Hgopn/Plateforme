@@ -20,5 +20,6 @@ command -v node >/dev/null || { echo '{"status":"critical","error":"node is requ
 for game in slot dark marble fight; do
   node --check "games/$game/$game.js"
 done
+node tests/test_dark_client.js
 git diff --check
 echo '{"status":"ok","checks":"monitor,health,pytest,ruff,bandit,javascript,git-diff"}'

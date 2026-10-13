@@ -6,17 +6,44 @@ import json
 import os
 import threading
 import urllib.request
+from collections import deque
 from uuid import uuid4
 
 import socketio
 
 from interarcade.config import Config
 from interarcade.database import Database
+from interarcade.games.dark import LEVELS
 
 
 API = os.getenv("INTERARCADE_FLOW_API", "http://api:5000")
 INTERNAL_TOKEN = os.environ["INTERARCADE_INTERNAL_EVENT_TOKEN"]
 ADMIN_TOKEN = os.environ["INTERARCADE_ADMIN_TOKEN"]
+
+
+def path_to_exit(state):
+    tiles = state["map"]["tiles"]
+    start = (state["player"]["x"], state["player"]["y"])
+    target = (state["map"]["exit"]["x"], state["map"]["exit"]["y"])
+    directions = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
+    queue = deque([start])
+    previous = {start: None}
+    while queue and target not in previous:
+        x, y = queue.popleft()
+        for direction, (dx, dy) in directions.items():
+            candidate = (x + dx, y + dy)
+            if candidate in previous or tiles[candidate[1]][candidate[0]] == "#":
+                continue
+            previous[candidate] = ((x, y), direction)
+            queue.append(candidate)
+    if target not in previous:
+        raise RuntimeError(f"Dark level {state['level']} has no route to its exit")
+    path = []
+    current = target
+    while current != start:
+        current, direction = previous[current]
+        path.append(direction)
+    return list(reversed(path))
 
 
 def post(path, data, headers=None):
@@ -85,6 +112,32 @@ def main():
         raise RuntimeError(f"unexpected received events: {received}")
     if received_by_dark:
         raise RuntimeError(f"event leaked into another session: {received_by_dark}")
+
+    dark_base = f"/api/v1/sessions/{sessions['dark']['session_id']}/games/dark"
+    dark_headers = {"Authorization": f"Bearer {sessions['dark']['token']}"}
+    dark_started = post(f"{dark_base}/start", {}, dark_headers)
+    if dark_started["state"]["map"]["width"] != 10:
+        raise RuntimeError(f"Dark level one did not load: {dark_started}")
+    dark_collision = post(f"{dark_base}/move", {"direction": "up"}, dark_headers)
+    if not dark_collision["outcome"]["collision"]:
+        raise RuntimeError(f"Dark wall collision was not enforced: {dark_collision}")
+    dark_state = dark_started["state"]
+    for number, expected_size in ((1, 10), (2, 15), (3, 20)):
+        if dark_state["level"] != number or dark_state["map"]["width"] != expected_size:
+            raise RuntimeError(f"Dark level {number} did not load: {dark_state}")
+        if dark_state["map"]["tiles"] != list(LEVELS[number].tiles):
+            raise RuntimeError(f"Dark level {number} is not the current authored map")
+        for direction in path_to_exit(dark_state):
+            result = post(f"{dark_base}/move", {"direction": direction}, dark_headers)
+            dark_state = result["state"]
+        transition = result["outcome"]["transition"]
+        if not transition or transition["completed_level"] != number:
+            raise RuntimeError(f"Dark level {number} did not complete: {result}")
+    if dark_state["status"] != "finished":
+        raise RuntimeError(f"Dark campaign did not finish: {dark_state}")
+    dark_reset = post(f"{dark_base}/reset", {}, dark_headers)
+    if dark_reset["state"]["level"] != 1 or dark_reset["state"]["moves"] != 0 or dark_reset["state"]["status"] != "active":
+        raise RuntimeError(f"Dark reset failed: {dark_reset}")
     for game_id in ("slot", "dark", "marble", "fight"):
         with urllib.request.urlopen(f"{API}/games/{game_id}/{game_id}.html", timeout=10) as response:  # nosec B310
             if response.status != 200:
@@ -110,6 +163,7 @@ def main():
         "games": list(sessions),
         "events_received": len(received),
         "session_isolation": True,
+        "dark_levels_completed": 3,
         "postgres_runtime_errors": True,
     }))
 

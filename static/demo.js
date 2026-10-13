@@ -1,6 +1,6 @@
 const games = [
   { id: "slot", name: "Slot", icon: "🎰", color: "#e66c3c", description: "La machine à cadeaux du live.", detail: "Chaque cadeau fait tourner la machine et construit le classement." },
-  { id: "dark", name: "Dark", icon: "🌑", color: "#78a878", description: "Un labyrinthe guidé par la communauté.", detail: "Les interactions aident les joueurs à progresser dans le noir." },
+  { id: "dark", name: "Dark", icon: "🌑", color: "#78a878", description: "Une exploration souterraine dans l’obscurité.", detail: "Traversez trois labyrinthes et trouvez chaque escalier avec pour seul repère un cercle de lumière." },
   { id: "marble", name: "Marble", icon: "🔮", color: "#d49554", description: "La course des likes et des cadeaux.", detail: "Likes et cadeaux font avancer les billes vers la victoire." },
   { id: "fight", name: "Fight", icon: "⚔️", color: "#c85c42", description: "L’arène interactive Inter Fight.", detail: "Une arène où la communauté rejoint les équipes et déclenche les actions." },
 ];
@@ -79,6 +79,7 @@ async function endCurrentSession() {
 
 async function launchGame(mode) {
   if (!currentGame) return;
+  if (currentGame.id === "dark" && mode === "tiktok") return;
   await endCurrentSession();
   $("game-session").textContent = mode === "test" ? "Préparation du test…" : "Connexion TikTok…";
   try {
@@ -105,6 +106,10 @@ async function showGame(gameId) {
   tiktokConfigured = false;
   $("tiktok-account-status").textContent = "Non configuré";
   $("marble-settings").classList.toggle("visible", currentGame.id === "marble");
+  $("launch-tiktok").disabled = currentGame.id === "dark";
+  $("launch-tiktok").textContent = currentGame.id === "dark"
+    ? "Live TikTok après validation"
+    : "Lancer avec TikTok →";
   setView("game");
 }
 
@@ -143,3 +148,5 @@ $("configure-tiktok").addEventListener("click", configureTikTok);
 $("send-event").addEventListener("click", sendEvent);
 $("event-type").addEventListener("change", () => { $("gift-field").style.display = $("event-type").value === "gift" ? "grid" : "none"; });
 renderCards(); bindNavigation(); refreshStatus(); setInterval(refreshStatus, 10000);
+const requestedGame = window.location.hash.slice(1);
+if (games.some((game) => game.id === requestedGame)) showGame(requestedGame);

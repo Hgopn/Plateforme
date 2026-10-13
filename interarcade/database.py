@@ -104,6 +104,20 @@ SCHEMA = (
         UNIQUE (session_id, round_number)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS dark_runs (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL UNIQUE,
+        level INTEGER NOT NULL DEFAULT 1,
+        status TEXT NOT NULL,
+        player_x INTEGER NOT NULL,
+        player_y INTEGER NOT NULL,
+        moves INTEGER NOT NULL DEFAULT 0,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        updated_at TEXT NOT NULL
+    )
+    """,
 )
 
 
@@ -273,6 +287,13 @@ class Database:
             cursor = connection.cursor()
             cursor.execute(self._sql("UPDATE live_sessions SET status = 'ended', ended_at = ? WHERE id = ? AND status = 'active'"), (timestamp, session_id))
             cursor.execute(self._sql("UPDATE marble_rounds SET status = 'ended', ended_at = ?, updated_at = ? WHERE session_id = ? AND status = 'active'"), (timestamp, timestamp, session_id))
+            cursor.execute(
+                self._sql(
+                    "UPDATE dark_runs SET status = 'ended', completed_at = ?, updated_at = ? "
+                    "WHERE session_id = ? AND status = 'active'"
+                ),
+                (timestamp, timestamp, session_id),
+            )
 
     def session(self, session_id: str):
         return self.fetchone("SELECT * FROM live_sessions WHERE id = ?", (session_id,))
@@ -304,6 +325,83 @@ class Database:
         if row:
             row["config"] = json.loads(row.pop("config_json"))
         return row
+
+    def start_dark_run(self, run_id: str, session_id: str, reset: bool = False):
+        from .games.dark import initial_state
+
+        current = self.dark_run(session_id)
+        if current and not reset:
+            return current
+        state = initial_state()
+        timestamp = now()
+        if current:
+            self.execute(
+                "UPDATE dark_runs SET level = ?, status = ?, player_x = ?, player_y = ?, "
+                "moves = ?, started_at = ?, completed_at = NULL, updated_at = ? WHERE session_id = ?",
+                (
+                    state["level"],
+                    state["status"],
+                    state["player_x"],
+                    state["player_y"],
+                    state["moves"],
+                    timestamp,
+                    timestamp,
+                    session_id,
+                ),
+            )
+        else:
+            self.execute(
+                "INSERT INTO dark_runs (id, session_id, level, status, player_x, player_y, "
+                "moves, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    run_id,
+                    session_id,
+                    state["level"],
+                    state["status"],
+                    state["player_x"],
+                    state["player_y"],
+                    state["moves"],
+                    timestamp,
+                    timestamp,
+                ),
+            )
+        return self.dark_run(session_id)
+
+    def dark_run(self, session_id: str):
+        return self.fetchone("SELECT * FROM dark_runs WHERE session_id = ?", (session_id,))
+
+    def move_dark(self, session_id: str, direction: str):
+        from .games.dark import apply_move
+
+        with self.connection() as connection:
+            cursor = connection.cursor()
+            query = "SELECT * FROM dark_runs WHERE session_id = ?"
+            if self.backend == "postgresql":
+                query += " FOR UPDATE"
+            cursor.execute(self._sql(query), (session_id,))
+            current = self._as_dict(cursor, cursor.fetchone())
+            if not current:
+                return None, None
+            next_state, outcome = apply_move(current, direction)
+            if next_state != current:
+                completed_at = now() if next_state["status"] == "finished" else None
+                cursor.execute(
+                    self._sql(
+                        "UPDATE dark_runs SET level = ?, status = ?, player_x = ?, player_y = ?, "
+                        "moves = ?, completed_at = ?, updated_at = ? WHERE session_id = ?"
+                    ),
+                    (
+                        next_state["level"],
+                        next_state["status"],
+                        next_state["player_x"],
+                        next_state["player_y"],
+                        next_state["moves"],
+                        completed_at,
+                        now(),
+                        session_id,
+                    ),
+                )
+            return next_state, outcome
 
     def apply_marble_event(self, event: dict, config: dict):
         """Atomically accept an event and update the current Marble round."""

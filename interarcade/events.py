@@ -37,6 +37,8 @@ class InterArcadeEvent:
             raise ValueError("event_id, tenant_id, session_id and actor are required strings")
         if not isinstance(self.payload, dict):
             raise ValueError("event payload must be an object")
+        if not isinstance(self.source, str) or not self.source.strip():
+            raise ValueError("event source must be a non-empty string")
         if self.type in {"gift", "like", "share"}:
             count = self.payload.get("count", 1)
             if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= 1_000_000:
@@ -45,6 +47,7 @@ class InterArcadeEvent:
             raise ValueError("gift name must be a string")
         if self.type == "comment" and not isinstance(self.payload.get("comment", ""), str):
             raise ValueError("comment must be a string")
+
     def to_dict(self) -> dict:
         return {
             "schema_version": self.schema_version,
@@ -59,7 +62,15 @@ class InterArcadeEvent:
         }
 
 
-def event_from_tiktok(tenant_id: str, session_id: str, event_type: str, actor: str, event_id: str | None = None, **payload):
+def event_from_source(
+    source: str,
+    tenant_id: str,
+    session_id: str,
+    event_type: str,
+    actor: str,
+    event_id: str | None = None,
+    **payload,
+):
     return InterArcadeEvent(
         tenant_id=tenant_id,
         session_id=session_id,
@@ -67,4 +78,24 @@ def event_from_tiktok(tenant_id: str, session_id: str, event_type: str, actor: s
         actor=actor,
         payload=payload,
         event_id=event_id or str(uuid4()),
+        source=source,
+    )
+
+
+def event_from_tiktok(
+    tenant_id: str,
+    session_id: str,
+    event_type: str,
+    actor: str,
+    event_id: str | None = None,
+    **payload,
+):
+    return event_from_source(
+        "tiktok",
+        tenant_id,
+        session_id,
+        event_type,
+        actor,
+        event_id=event_id,
+        **payload,
     )

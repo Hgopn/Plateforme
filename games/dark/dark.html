@@ -1,37 +1,46 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Dans le Noir – Niveau</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dark — InterArcade</title>
   <link rel="stylesheet" href="dark.css">
 </head>
 <body>
+  <main id="dark-app">
+    <header class="hud">
+      <div>
+        <span class="game-mark">INTERARCADE / DARK</span>
+        <strong id="level-label">Niveau —</strong>
+      </div>
+      <div class="hud-actions">
+        <span id="session-state" class="session-state">Initialisation</span>
+        <button id="reset-button" type="button">Recommencer</button>
+      </div>
+    </header>
 
-  <div id="level-display">LEVEL 1</div>
-  <div id="game-container">
+    <section id="viewport" class="viewport" aria-label="Labyrinthe Dark">
+      <canvas id="game-canvas"></canvas>
+      <div class="vignette" aria-hidden="true"></div>
+      <div id="message" class="message visible" aria-live="polite">
+        <span class="message-kicker">OBJECTIF</span>
+        <strong>Trouvez l’escalier</strong>
+        <small>Déplacez-vous avec les flèches ou ZQSD.</small>
+      </div>
+      <div id="error-panel" class="error-panel hidden" role="alert"></div>
+    </section>
 
-    <!-- 🧱 Labyrinthe -->
-    <div id="maze"></div>
-
-    <!-- ⚫ Lumière gérée UNIQUEMENT par canvas (ajouté via JS) -->
-
-  </div>
-
-  <!-- 🎮 Boutons -->
-  <div id="controls">
-  <div class="row">
-    <button data-dir="up">⬆️</button>
-  </div>
-
-  <div class="row">
-    <button data-dir="left">⬅️</button>
-    <button data-dir="right">➡️</button>
-  </div>
-
-  <div class="row">
-    <button data-dir="down">⬇️</button>
-  </div>
-</div>
+    <footer class="game-footer">
+      <div class="objective"><span class="objective-dot"></span><span id="objective-text">Cherchez la sortie dans l’obscurité.</span></div>
+      <div id="move-count" class="move-count">0 pas</div>
+      <div class="dpad" aria-label="Commandes tactiles">
+        <button type="button" data-direction="up" aria-label="Monter">↑</button>
+        <button type="button" data-direction="left" aria-label="Aller à gauche">←</button>
+        <button type="button" data-direction="down" aria-label="Descendre">↓</button>
+        <button type="button" data-direction="right" aria-label="Aller à droite">→</button>
+      </div>
+    </footer>
+  </main>
 
   <script src="../vendor/socket.io-4.7.5.min.js"></script>
   <script src="dark.js"></script>
