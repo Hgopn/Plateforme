@@ -18,6 +18,14 @@ class JsonFormatter(logging.Formatter):
         }
         if hasattr(record, "component"):
             payload["component"] = record.component
+        for name in (
+            "event_id", "original_event_id", "session_id", "source_platform", "source_account_id",
+            "event_type", "action_type", "gift_id", "gift_name", "repeat_count",
+            "like_total", "reason",
+            "room_id", "previous_room_id", "sdk_live_status", "error_type", "retry_seconds",
+        ):
+            if hasattr(record, name):
+                payload[name] = getattr(record, name)
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
         return json.dumps(payload, ensure_ascii=False)

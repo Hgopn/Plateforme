@@ -23,6 +23,8 @@ class WorkerService:
         if not config.INTERNAL_EVENT_TOKEN:
             raise RuntimeError("INTERARCADE_INTERNAL_EVENT_TOKEN is required")
         configure_logging(config.LOG_LEVEL)
+        # SDK/httpx INFO lines contain full request URLs and overwhelm lifecycle logs.
+        logging.getLogger("httpx").setLevel(logging.WARNING)
         self.database = Database(config.DATABASE_URL)
         self.database.initialize()
         self.workers: dict[str, LiveSource] = {}
@@ -80,22 +82,32 @@ class WorkerService:
             ))
 
         def stopped():
-            self.database.update_live_source(source_id, "stopped")
+            current = self.database.live_source(source_id)
+            session = self.database.session(binding.session_id)
+            if current and current["status"] == "stopping" or not session or session["status"] != "active":
+                self.database.update_live_source(source_id, "stopped")
+            else:
+                self.database.update_live_source_runtime(source_id, "reconnecting")
             if self.workers.get(source_id) is worker:
                 self.workers.pop(source_id, None)
 
+        def status_changed(status):
+            self.database.update_live_source_runtime(source_id, status)
+
         worker = TikTokWorker(
             binding, emit,
-            self.config.TIKTOK_SIGN_API_KEY, on_stopped=stopped,
+            self.config.TIKTOK_SIGN_API_KEY, on_stopped=stopped, on_status=status_changed,
+            trace=self.config.TIKTOK_DARK_TRACE,
         )
         self.workers[source_id] = worker
-        self.database.update_live_source(source_id, "running")
+        self.database.update_live_source_runtime(source_id, "connecting")
         worker.start()
 
     def run_once(self):
+        self.database.expire_abandoned_sessions(self.config.CREATOR_SESSION_LEASE_SECONDS)
         for row in self.database.live_sources():
             try:
-                if row["status"] in {"starting", "running"}:
+                if row["status"] in {"starting", "running", "connecting", "connected", "offline", "reconnecting"}:
                     session = self.database.session(row["session_id"])
                     if session and session["status"] == "active":
                         self._start(row)

@@ -24,9 +24,14 @@ class Config:
     INTERNAL_EVENT_TOKEN = os.getenv("INTERARCADE_INTERNAL_EVENT_TOKEN", "")
     ADMIN_TOKEN = os.getenv("INTERARCADE_ADMIN_TOKEN", "")
     TIKTOK_SIGN_API_KEY = os.getenv("EULER_API_KEY", "")
+    DARK_TIKTOK_MAPPING_PATH = Path(
+        os.getenv("INTERARCADE_DARK_TIKTOK_MAPPING_PATH") or BASE_DIR / "config" / "dark_tiktok_mapping.json"
+    )
+    TIKTOK_DARK_TRACE = _bool("INTERARCADE_TIKTOK_DARK_TRACE", False)
     API_URL = os.getenv("INTERARCADE_API_URL", "http://127.0.0.1:5000")
     WORKER_POLL_SECONDS = float(os.getenv("INTERARCADE_WORKER_POLL_SECONDS", "2"))
     WORKER_HEARTBEAT_TIMEOUT_SECONDS = float(os.getenv("INTERARCADE_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "15"))
+    CREATOR_SESSION_LEASE_SECONDS = int(os.getenv("INTERARCADE_CREATOR_SESSION_LEASE_SECONDS", "120"))
     REQUIRE_WORKER_HEARTBEAT = _bool("INTERARCADE_REQUIRE_WORKER_HEARTBEAT", False)
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:////tmp/interarcade-dev.db")
     BROKER_URL = os.getenv("REDIS_URL", "")
@@ -34,6 +39,7 @@ class Config:
     OBSERVER_TOKEN = os.getenv("INTERARCADE_OBSERVER_TOKEN", "")
     GIT_VERSION = os.getenv("INTERARCADE_GIT_VERSION", "unknown")
     DEMO_MODE = _bool("INTERARCADE_DEMO_MODE", False)
+    COOKIE_SECURE = _bool("INTERARCADE_COOKIE_SECURE", False)
     DEMO_TENANT_ID = os.getenv("INTERARCADE_DEMO_TENANT_ID", "demo-creator")
     DEMO_USERNAME = os.getenv("INTERARCADE_DEMO_USERNAME", "demo-creator")
     PORT = int(os.getenv("PORT", "5000"))

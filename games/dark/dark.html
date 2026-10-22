@@ -10,7 +10,8 @@
   <main id="dark-app">
     <header class="hud">
       <div>
-        <span class="game-mark">INTERARCADE / DARK</span>
+        <span class="game-mark">DARK <small>INTERARCADE</small></span>
+        <span class="test-mark">MODE TEST</span>
         <strong id="level-label">Niveau —</strong>
       </div>
       <div class="hud-actions">
@@ -27,6 +28,8 @@
         <strong>Trouvez l’escalier</strong>
         <small>Déplacez-vous avec les flèches ou ZQSD.</small>
       </div>
+      <div id="live-action-notice" class="live-action-notice" role="status" aria-live="polite"></div>
+      <div id="live-help" class="live-help" aria-hidden="true"></div>
       <div id="error-panel" class="error-panel hidden" role="alert"></div>
     </section>
 
@@ -43,6 +46,7 @@
   </main>
 
   <script src="../vendor/socket.io-4.7.5.min.js"></script>
+  <script src="dark_actions.js"></script>
   <script src="dark.js"></script>
 </body>
 </html>

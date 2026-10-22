@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import hmac
+import json
 import secrets
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
@@ -13,13 +18,16 @@ from flask_socketio import SocketIO, emit
 from .auth import issue_token, verify_token
 from .broker import Broker
 from .config import Config
+from .creator_auth import check_password, hash_password, normalize_email, normalize_tiktok, valid_password
 from .database import Database
+from .dark_tiktok_mapping import DarkTikTokMapping, mapped_action_event
 from .events import PLATFORM_PATTERN, event_from_source
 from .logging import configure_logging
 
 
 socketio = SocketIO()
 SUPPORTED_GAMES = ("slot", "dark", "marble", "fight")
+ACTIVE_SOURCE_STATUSES = {"starting", "running", "connecting", "connected", "offline", "reconnecting"}
 RESERVED_EVENT_FIELDS = {
     "source", "tenant_id", "session_id", "event_type", "type", "actor", "event_id",
     "source_account_id", "source_username", "actor_platform_id", "timestamp", "event_value",
@@ -45,6 +53,7 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
     database = Database(config_class.DATABASE_URL)
     database.initialize()
+    dark_tiktok_mapping = DarkTikTokMapping.from_path(config_class.DARK_TIKTOK_MAPPING_PATH)
     broker = Broker(config_class.BROKER_URL)
     origins = config_class.origins()
     if origins:
@@ -57,9 +66,77 @@ def create_app(config_class=Config):
 
     app.extensions["database"] = database
     app.extensions["broker"] = broker
+    app.extensions["dark_tiktok_mapping"] = dark_tiktok_mapping
+
+    @app.after_request
+    def secure_response(response):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        if request.path.startswith("/api/v1/creator/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+    def login_token():
+        return request.cookies.get("ia_creator", "")
+
+    def csrf_for(token):
+        return hmac.new(app.config["SESSION_SECRET"].encode(), token.encode(), hashlib.sha256).hexdigest()
+
+    def current_creator():
+        token = login_token()
+        if not token:
+            return None
+        login = database.creator_login(hashlib.sha256(token.encode()).hexdigest())
+        if not login or login["expires_at"] <= datetime.now(timezone.utc).isoformat():
+            return None
+        account = database.creator_account(login["account_id"])
+        if not account or not account["enabled"]:
+            return None
+        return account, login
+
+    def creator_or_error(mutation=False):
+        creator = current_creator()
+        if not creator:
+            return None
+        if mutation:
+            supplied = request.headers.get("X-CSRF-Token", "")
+            actual = hashlib.sha256(supplied.encode()).hexdigest()
+            if not supplied or not secrets.compare_digest(actual, creator[1]["csrf_hash"]):
+                return None
+        return creator[0]
+
+    def same_site_request():
+        origin = request.headers.get("Origin")
+        return not origin or urlparse(origin).netloc == request.host
+
+    def set_creator_cookie(response, account_id, remember):
+        token = secrets.token_urlsafe(32)
+        age = 30 * 86400 if remember else 12 * 3600
+        expires = (datetime.now(timezone.utc) + timedelta(seconds=age)).isoformat()
+        csrf = csrf_for(token)
+        database.save_creator_login(
+            hashlib.sha256(token.encode()).hexdigest(), account_id,
+            hashlib.sha256(csrf.encode()).hexdigest(), expires,
+        )
+        response.set_cookie(
+            "ia_creator", token, max_age=age, httponly=True, secure=bool(config_class.COOKIE_SECURE),
+            samesite="Strict", path="/",
+        )
+        return response, csrf
+
+    def creator_summary(account):
+        return {
+            "email": account["email"], "tenant_id": account["tenant_id"],
+            "active": bool(account["enabled"]),
+            "entitled_games": database.entitled_games(account["tenant_id"]),
+            "platforms": database.creator_platforms(account["id"]),
+        }
 
     def publish_event(event):
         socketio.emit("ia:event", event.to_dict(), to=f"session:{event.session_id}")
+
+    def publish_dark_action(action):
+        socketio.emit("ia:action", action, to=f"session:{action['session_id']}")
 
     def publish_marble_state(session_id, state):
         if not state:
@@ -102,9 +179,76 @@ def create_app(config_class=Config):
                 event.session_id, event.source_platform, event.source_account_id
             )
             if not source or source["tenant_id"] != event.tenant_id or source["status"] not in {
-                "starting", "running", "simulated"
+                "starting", "connecting", "connected", "running", "reconnecting", "simulated"
             }:
                 return False, None, "source_inactive"
+        dark_action = None
+        if event.type == "action":
+            if session.get("game_id") != "dark":
+                return False, None, "action_requires_dark_session"
+            run = database.dark_run(event.session_id)
+            if not run or run["status"] != "active":
+                return False, None, "dark_run_inactive"
+            from .games.dark_actions import action_from_event
+
+            try:
+                dark_action = action_from_event(event)
+            except ValueError:
+                return False, None, "invalid_dark_action"
+        if session.get("game_id") == "dark" and event.source_platform == "tiktok" and event.type != "action":
+            run = database.dark_run(event.session_id)
+            if run and run["status"] == "active":
+                if config_class.TIKTOK_DARK_TRACE:
+                    logger.info("tiktok_event_received", extra={
+                        "component": "dark_live", "event_id": event.event_id,
+                        "source_platform": event.source_platform,
+                        "session_id": event.session_id, "source_account_id": event.source_account_id,
+                        "event_type": event.type, "gift_id": event.payload.get("gift_id"),
+                        "gift_name": event.payload.get("gift_name"),
+                        "repeat_count": event.payload.get("repeat_count"),
+                    })
+
+                def build_action(source_event, threshold_crossed):
+                    decision = dark_tiktok_mapping.decide(source_event, threshold_crossed)
+                    action_event = mapped_action_event(source_event, decision.action_type) \
+                        if decision.action_type else None
+                    return action_event, decision
+
+                accepted, mapped_event, decision, like_total = database.record_dark_tiktok_event(
+                    event, dark_tiktok_mapping.like_threshold, build_action
+                )
+                if accepted:
+                    publish_event(event)
+                    action = None
+                    if mapped_event:
+                        publish_event(mapped_event)
+                        from .games.dark_actions import action_from_event
+
+                        action = action_from_event(mapped_event)
+                        publish_dark_action(action)
+                    if config_class.TIKTOK_DARK_TRACE:
+                        logger.info("tiktok_dark_mapping", extra={
+                            "component": "dark_live", "event_id": event.event_id,
+                            "source_platform": event.source_platform,
+                            "event_type": event.type, "action_type": decision.action_type,
+                            "reason": decision.reason, "like_total": like_total,
+                            "gift_id": event.payload.get("gift_id"),
+                            "gift_name": event.payload.get("gift_name"),
+                        })
+                        if action:
+                            logger.info("dark_action_delivered", extra={
+                                "component": "dark_live", "event_id": action["event_id"],
+                                "source_platform": event.source_platform,
+                                "original_event_id": event.event_id,
+                                "session_id": event.session_id, "action_type": action["action_type"],
+                            })
+                elif config_class.TIKTOK_DARK_TRACE:
+                    logger.info("tiktok_event_duplicate", extra={
+                        "component": "dark_live", "event_id": event.event_id,
+                        "source_platform": event.source_platform,
+                        "session_id": event.session_id, "event_type": event.type,
+                    })
+                return bool(accepted), action if accepted else None, None if accepted else "duplicate_event"
         marble_state = None
         if session.get("game_id") == "marble":
             round_state = database.marble_round(event.session_id)
@@ -116,8 +260,10 @@ def create_app(config_class=Config):
             accepted = database.record_event(event.to_dict())
         if accepted:
             publish_event(event)
+            if dark_action:
+                publish_dark_action(dark_action)
             publish_marble_state(event.session_id, marble_state)
-        return bool(accepted), marble_state, None if accepted else "duplicate_event"
+        return bool(accepted), dark_action or marble_state, None if accepted else "duplicate_event"
 
     def authorize_request(data, game_id=None):
         token = _bearer_token() or (data or {}).get("license_key", "")
@@ -169,10 +315,204 @@ def create_app(config_class=Config):
         return response
 
     @app.get("/")
+    def site_index():
+        return render_template("site.html")
+
+    @app.get("/launcher")
+    def launcher_index():
+        return render_template("launcher.html")
+
+    @app.get("/broadcast/waiting")
+    def broadcast_waiting():
+        return render_template("broadcast_waiting.html")
+
+    @app.get("/demo")
     def demo_index():
         if not config_class.DEMO_MODE:
             return jsonify({"error": "demo_disabled"}), 404
         return render_template("demo.html", demo_username=config_class.DEMO_USERNAME)
+
+    @app.post("/api/v1/creator/register")
+    def creator_register():
+        if not same_site_request():
+            return jsonify({"error": "origin_rejected"}), 403
+        data = request.get_json(silent=True)
+        data = data if isinstance(data, dict) else {}
+        email = normalize_email(data.get("email"))
+        password = data.get("password")
+        if not email or not valid_password(password):
+            return jsonify({"error": "invalid_registration"}), 400
+        account_id = secrets.token_urlsafe(18)
+        tenant_id = f"creator:{account_id}"
+        try:
+            database.create_creator_account(account_id, tenant_id, email, hash_password(password))
+        except ValueError:
+            return jsonify({"error": "email_already_registered"}), 409
+        account = database.creator_account(account_id)
+        response = jsonify(creator_summary(account))
+        response, csrf = set_creator_cookie(response, account_id, data.get("remember") is True)
+        response.set_data(json.dumps({**creator_summary(account), "csrf_token": csrf}))
+        return response, 201
+
+    @app.post("/api/v1/creator/login")
+    def creator_login():
+        if not same_site_request():
+            return jsonify({"error": "origin_rejected"}), 403
+        data = request.get_json(silent=True)
+        data = data if isinstance(data, dict) else {}
+        email = normalize_email(data.get("email"))
+        password = data.get("password")
+        account = database.creator_account_by_email(email) if email else None
+        if not isinstance(password, str) or not account or not account["enabled"] \
+                or not check_password(password, account["password_hash"]):
+            return jsonify({"error": "invalid_credentials"}), 401
+        response = jsonify(creator_summary(account))
+        response, csrf = set_creator_cookie(response, account["id"], data.get("remember") is True)
+        response.set_data(json.dumps({**creator_summary(account), "csrf_token": csrf}))
+        return response
+
+    @app.get("/api/v1/creator/me")
+    def creator_me():
+        creator = current_creator()
+        if not creator:
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify({**creator_summary(creator[0]), "csrf_token": csrf_for(login_token())})
+
+    @app.post("/api/v1/creator/logout")
+    def creator_logout():
+        account = creator_or_error(mutation=True)
+        if not account:
+            return jsonify({"error": "unauthorized"}), 401
+        database.revoke_creator_login(hashlib.sha256(login_token().encode()).hexdigest())
+        response = jsonify({"status": "signed_out"})
+        response.delete_cookie("ia_creator", path="/")
+        return response
+
+    @app.post("/api/v1/creator/platforms/tiktok")
+    def configure_creator_tiktok():
+        account = creator_or_error(mutation=True)
+        if not account:
+            return jsonify({"error": "unauthorized"}), 401
+        data = request.get_json(silent=True)
+        data = data if isinstance(data, dict) else {}
+        username = normalize_tiktok(data.get("username"))
+        if not username:
+            return jsonify({"error": "invalid_tiktok_username"}), 400
+        database.configure_creator_platform(account["id"], "tiktok", username)
+        return jsonify({"platform": "tiktok", "username": username, "status": "configured"})
+
+    @app.post("/api/v1/creator/sessions")
+    def create_creator_session():
+        account = creator_or_error(mutation=True)
+        if not account:
+            return jsonify({"error": "unauthorized"}), 401
+        data = request.get_json(silent=True)
+        data = data if isinstance(data, dict) else {}
+        mode = data.get("mode")
+        if data.get("game_id") != "dark" or mode not in {"test", "live"}:
+            return jsonify({"error": "game_unavailable"}), 400
+        database.expire_abandoned_sessions(config_class.CREATOR_SESSION_LEASE_SECONDS)
+        try:
+            session_id, created = database.launch_creator_dark_session(
+                account["id"], account["tenant_id"], mode,
+                secrets.token_urlsafe(18), secrets.token_urlsafe(18),
+            )
+        except ValueError as exc:
+            code = str(exc)
+            return jsonify({"error": code}), (403 if code == "license_required" else 409)
+        return jsonify(creator_session_launch(account, session_id, mode)), (201 if created else 200)
+
+    def creator_session_launch(account, session_id, mode):
+        return {
+            "session_id": session_id, "mode": mode,
+            "token": issue_token(
+                app.config["SESSION_SECRET"],
+                {"tenant_id": account["tenant_id"], "session_id": session_id},
+                ttl_seconds=8 * 3600,
+            ),
+        }
+
+    def owned_creator_session(session_id, account):
+        session = database.session(session_id)
+        return session if session and session["tenant_id"] == account["tenant_id"] else None
+
+    @app.get("/api/v1/creator/sessions/active")
+    def active_creator_session():
+        account = creator_or_error()
+        if not account:
+            return jsonify({"error": "unauthorized"}), 401
+        database.expire_abandoned_sessions(config_class.CREATOR_SESSION_LEASE_SECONDS)
+        session = database.active_creator_session(account["tenant_id"])
+        if not session:
+            return jsonify({"session": None})
+        database.touch_creator_session(session["id"])
+        return jsonify({"session": creator_session_launch(account, session["id"], session["mode"])})
+
+    @app.get("/api/v1/creator/sessions/<session_id>")
+    def creator_session_status(session_id):
+        account = creator_or_error()
+        if not account:
+            return jsonify({"error": "unauthorized"}), 401
+        session = owned_creator_session(session_id, account)
+        if not session:
+            return jsonify({"error": "session_not_found"}), 404
+        if session["status"] == "active":
+            database.touch_creator_session(session_id)
+        worker_lost = (
+            session["mode"] == "live" and config_class.REQUIRE_WORKER_HEARTBEAT
+            and not database.worker_heartbeat(config_class.WORKER_HEARTBEAT_TIMEOUT_SECONDS)["ok"]
+        )
+        return jsonify({
+            "session_id": session_id, "status": session["status"], "mode": session["mode"],
+            "sources": [
+                {"platform": source["platform"], "username": source["username"],
+                 "status": ("lost" if worker_lost and source["status"] not in {"stopped", "stopping"}
+                            else source["status"])}
+                for source in database.live_sources(session_id)
+            ],
+        })
+
+    @app.post("/api/v1/creator/sessions/<session_id>/end")
+    def end_creator_session(session_id):
+        account = creator_or_error(mutation=True)
+        if not account:
+            return jsonify({"error": "unauthorized"}), 401
+        session = owned_creator_session(session_id, account)
+        if not session:
+            return jsonify({"error": "session_not_found"}), 404
+        database.end_session(session_id)
+        return jsonify({"session_id": session_id, "status": "ended"})
+
+    @app.post("/api/v1/creator/sessions/<session_id>/actions")
+    def creator_test_action(session_id):
+        account = creator_or_error(mutation=True)
+        if not account:
+            return jsonify({"error": "unauthorized"}), 401
+        session = owned_creator_session(session_id, account)
+        if not session or session["mode"] != "test" or session["status"] != "active":
+            return jsonify({"error": "test_session_required"}), 409
+        run = database.dark_run(session_id)
+        if not run or run["status"] != "active":
+            return jsonify({"error": "dark_run_inactive"}), 409
+        data = request.get_json(silent=True)
+        data = data if isinstance(data, dict) else {}
+        from .games.dark_actions import ACTION_DURATIONS_MS
+
+        action_type = data.get("action_type")
+        actor = data.get("actor_username", "Spectateur test")
+        if not isinstance(action_type, str) or action_type not in ACTION_DURATIONS_MS \
+                or not isinstance(actor, str) \
+                or not actor.strip() or len(actor) > 40:
+            return jsonify({"error": "invalid_action"}), 400
+        event = event_from_source(
+            "test", account["tenant_id"], session_id, "action", actor.strip(),
+            source_account_id="local", source_username="Mode Test", actor_platform_id=actor.strip(),
+            action_type=action_type,
+        )
+        accepted, action, rejection = process_event(event)
+        if rejection:
+            return jsonify({"error": rejection}), 409
+        return jsonify({**action, "accepted": accepted}), 202
 
     @app.get("/games/manifest.json")
     def games_manifest():
@@ -345,7 +685,7 @@ def create_app(config_class=Config):
         if not simulated and platform != "tiktok":
             return jsonify({"error": "connector_unavailable"}), 501
         current = database.live_source_for_session(session_id, platform, account_id)
-        if current and current["status"] in {"starting", "running", "simulated"}:
+        if current and current["status"] in ACTIVE_SOURCE_STATUSES | {"simulated"}:
             return jsonify(current), 200
         source = database.save_live_source(
             current["id"] if current else secrets.token_urlsafe(18),
@@ -386,9 +726,11 @@ def create_app(config_class=Config):
             return jsonify({"error": "active_session_not_found"}), 404
         current = next(
             (row for row in database.listeners() if row["tenant_id"] == tenant_id
-             and row["status"] in {"running", "starting"}), None
+             and row["status"] in ACTIVE_SOURCE_STATUSES), None
         )
         if current:
+            if current["session_id"] != session_id:
+                return jsonify({"error": "listener_already_bound"}), 409
             return jsonify({"status": "already_running", "tenant_id": tenant_id}), 200
         database.save_listener(tenant_id, username, session_id, "starting")
         return jsonify({"status": "started", "tenant_id": tenant_id, "session_id": session_id}), 202
@@ -399,7 +741,7 @@ def create_app(config_class=Config):
         tenant_id = (data.get("tenant_id") or data.get("username") or "").strip()
         listener = next(
             (row for row in database.listeners() if row["tenant_id"] == tenant_id
-             and row["status"] in {"running", "starting"}), None
+             and row["status"] in ACTIVE_SOURCE_STATUSES), None
         )
         if not authorize_admin() or not tenant_id or not listener:
             return jsonify({"error": "unauthorized_or_not_found"}), 404
@@ -462,7 +804,11 @@ def create_app(config_class=Config):
         accepted, _, rejection = process_event(event, require_source="source_account_id" in data)
         if rejection == "session_not_found":
             return jsonify({"error": rejection}), 404
+        if rejection == "invalid_dark_action":
+            return jsonify({"error": rejection}), 400
         if rejection in {"session_tenant_mismatch", "session_inactive", "source_inactive"}:
+            return jsonify({"error": rejection}), 409
+        if rejection in {"action_requires_dark_session", "dark_run_inactive"}:
             return jsonify({"error": rejection}), 409
         response = event.to_dict()
         response["accepted"] = accepted
@@ -533,6 +879,56 @@ def create_app(config_class=Config):
         response = event.to_dict()
         response["accepted"] = accepted
         return jsonify(response), 202
+
+    @app.post("/api/v1/demo/dark/actions")
+    def demo_dark_action():
+        """Local launcher control; never starts a platform connector."""
+        if not config_class.DEMO_MODE:
+            return jsonify({"error": "demo_disabled"}), 404
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "invalid_action"}), 400
+        session_id = data.get("session_id")
+        session = authorized_session(session_id) if isinstance(session_id, str) else None
+        if not session or session["tenant_id"] != config_class.DEMO_TENANT_ID \
+                or session["game_id"] != "dark" or session["status"] != "active":
+            return jsonify({"error": "unauthorized_or_inactive_dark_session"}), 401
+        run = database.dark_run(session_id)
+        if not run or run["status"] != "active":
+            return jsonify({"error": "dark_run_inactive"}), 409
+        from .games.dark_actions import ACTION_DURATIONS_MS
+
+        action_type = data.get("action_type")
+        platform = data.get("source_platform", "test")
+        account_id = data.get("source_account_id", "local" if platform == "test" else f"demo-{platform}")
+        source_username = data.get("source_username", "Mode Test" if platform == "test" else account_id)
+        actor = data.get("actor_username", "demo-viewer")
+        actor_id = data.get("actor_platform_id", actor)
+        if not isinstance(action_type, str) or action_type not in ACTION_DURATIONS_MS or (
+            not isinstance(platform, str) or not PLATFORM_PATTERN.fullmatch(platform)
+            or any(not isinstance(value, str) or not value.strip()
+                   for value in (account_id, source_username, actor, actor_id))
+        ):
+            return jsonify({"error": "invalid_action"}), 400
+        if platform != "test":
+            source = database.live_source_for_session(session_id, platform, account_id)
+            if source and source["status"] not in {"simulated", "stopped"}:
+                return jsonify({"error": "source_is_not_simulated"}), 409
+            if not source or source["status"] == "stopped":
+                database.save_live_source(
+                    source["id"] if source else secrets.token_urlsafe(18),
+                    session["tenant_id"], session_id, platform, account_id,
+                    source_username, "simulated",
+                )
+        event = event_from_source(
+            platform, session["tenant_id"], session_id, "action", actor,
+            source_account_id=account_id, source_username=source_username,
+            actor_platform_id=actor_id, action_type=action_type,
+        )
+        accepted, action, rejection = process_event(event, require_source=platform != "test")
+        if rejection:
+            return jsonify({"error": rejection}), 409
+        return jsonify({**action, "accepted": accepted}), 202
 
     @app.get("/api/v1/diagnostics")
     def diagnostics():

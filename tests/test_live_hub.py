@@ -181,10 +181,12 @@ class LiveHubTests(unittest.TestCase):
                          ("tiktok", "creator", "starting"))
 
         class FakeTikTok:
-            def __init__(self, binding, emit, _sign_api_key, on_stopped):
+            def __init__(self, binding, emit, _sign_api_key, on_stopped, on_status=None,
+                         trace=False):
                 self.binding = binding
                 self.emit = emit
                 self.on_stopped = on_stopped
+                self.on_status = on_status
                 self.should_run = True
                 self.started = False
 

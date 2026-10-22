@@ -48,8 +48,15 @@ ISO 8601 datetime with a timezone. `source`, `type`, and `actor` are
 compatibility aliases; `actor` is a display name and must not be used as an
 identity key.
 
-Supported event types are `gift`, `like`, `comment`, `share`, and
-`follow`. The API accepts old internal version 1 inputs and fills missing
+Supported event types are `gift`, `like`, `comment`, `share`, `follow`, and
+`action`. An `action` event carries an InterArcade action key in
+`payload.action_type`; for Dark, the API accepts only the five keys in
+[DARK_LIVE_ACTIONS.md](DARK_LIVE_ACTIONS.md), fixes their duration server-side,
+and publishes a separate `ia:action` message with the source and viewer
+identity fields preserved. A mapped TikTok action also contains `trigger`
+with the original event ID/type and any available gift or like metadata;
+see [TIKTOK_DARK_LIVE_TEST.md](TIKTOK_DARK_LIVE_TEST.md). The API accepts old
+internal version 1 inputs and fills missing
 source metadata for compatibility. New connectors send the complete envelope
 through authenticated internal ingress. Explicitly identified sources must
 be attached to the active session. Browser input is never an authoritative

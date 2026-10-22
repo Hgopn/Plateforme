@@ -11,6 +11,8 @@
 The Live Hub source model and local multi-source simulation are documented in
 [LIVE_HUB.md](LIVE_HUB.md). Simulated sources require Demo mode and never
 connect to TikTok or Twitch.
+The controlled TikTok → Dark mapping test is described in
+[TIKTOK_DARK_LIVE_TEST.md](TIKTOK_DARK_LIVE_TEST.md).
 
 The existing game pages remain static files under `/games/<game>/<game>.html`.
 Socket.IO accepts only signed tokens for active persisted sessions. Connections
@@ -19,7 +21,10 @@ join a session-specific room so simultaneous games from one tenant are isolated.
 ## Local browser demo
 
 The integration environment can enable a local-only demonstration catalogue at
-`http://127.0.0.1:15000/`. It provides the four existing games in a vertical
+`http://127.0.0.1:15000/demo`. It provides the four existing games in a vertical
 frame, runtime status, and demo-only simulated events. The demo endpoints are
 disabled when `INTERARCADE_DEMO_MODE=false`. Keep `INTERARCADE_BIND_HOST` on a
 loopback address unless a temporary private-network test is explicitly needed.
+
+The product website is at `/` and the creator launcher is at `/launcher`.
+The current desktop build and VPS procedures are in [PRODUCTIZATION.md](PRODUCTIZATION.md).

@@ -1,0 +1,98 @@
+x-logging: &bounded-json-logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  proxy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    logging: *bounded-json-logs
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      INTERARCADE_DOMAIN: ${INTERARCADE_DOMAIN}
+      INTERARCADE_TLS_EMAIL: ${INTERARCADE_TLS_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_started
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    logging: *bounded-json-logs
+    env_file: ../.env.production
+    environment:
+      DATABASE_URL: postgresql://interarcade:${INTERARCADE_DB_PASSWORD}@postgres:5432/interarcade
+      REDIS_URL: redis://redis:6379/0
+      INTERARCADE_API_URL: http://api:5000
+      INTERARCADE_COOKIE_SECURE: "true"
+      INTERARCADE_DEMO_MODE: "false"
+      HOST: 0.0.0.0
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health/live', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile.production
+    restart: unless-stopped
+    logging: *bounded-json-logs
+    command: ["python", "-m", "interarcade.worker"]
+    env_file: ../.env.production
+    environment:
+      DATABASE_URL: postgresql://interarcade:${INTERARCADE_DB_PASSWORD}@postgres:5432/interarcade
+      REDIS_URL: redis://redis:6379/0
+      INTERARCADE_API_URL: http://api:5000
+      INTERARCADE_DEMO_MODE: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17.11-alpine3.24
+    restart: unless-stopped
+    logging: *bounded-json-logs
+    environment:
+      POSTGRES_DB: interarcade
+      POSTGRES_USER: interarcade
+      POSTGRES_PASSWORD: ${INTERARCADE_DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U interarcade -d interarcade"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  redis:
+    image: redis:7.4.6-alpine
+    restart: unless-stopped
+    logging: *bounded-json-logs
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

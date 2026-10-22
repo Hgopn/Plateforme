@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#252d28">
+  <title>InterArcade — Le live prend part au jeu</title>
+  <meta name="description" content="InterArcade transforme les interactions de votre public en actions de jeu. Découvrez Dark et préparez votre prochain live.">
+  <link rel="stylesheet" href="{{ url_for('static', filename='product.css') }}">
+</head>
+<body class="site-page">
+  <header class="site-header wrap">
+    <a class="wordmark" href="/" aria-label="InterArcade, accueil">INTER<span>ARCADE</span></a>
+    <nav aria-label="Navigation principale"><a href="#jeux">Jeux</a><a href="#comment">Comment ça marche</a><a href="#plateformes">Plateformes</a></nav>
+    <a class="header-link" href="/launcher">Se connecter <span aria-hidden="true">↗</span></a>
+  </header>
+  <main>
+    <section class="site-hero wrap">
+      <div class="site-hero-copy"><p class="eyebrow">INTERARCADE / POUR LES CRÉATEURS LIVE</p><h1>Le live entre<br>dans <em>la partie.</em></h1><p>InterArcade transforme les réactions de votre public en actions de jeu. Lancez Dark, capturez sa fenêtre et jouez avec votre communauté.</p><div class="button-row"><a class="button primary" href="/launcher">Explorer InterArcade <span>↗</span></a><a class="button text" href="#comment">Voir comment ça marche <span>↓</span></a></div><div class="hero-footnote">Une fenêtre de jeu à capturer avec OBS, Streamlabs, TikTok LIVE Studio ou votre logiciel habituel.</div></div>
+      <div class="hero-art"><img src="{{ url_for('static', filename='art/dark.svg') }}" alt="Illustration du labyrinthe de Dark, éclairé autour du personnage"><div class="hero-art-caption"><span>DARK</span><span>01 / DISPONIBLE</span></div></div>
+    </section>
+    <section id="comment" class="how-section"><div class="wrap"><div class="section-title"><p class="eyebrow">LE PRINCIPE</p><h2>Une partie. Toute une communauté.</h2></div><div class="steps"><article><span>01</span><h3>Choisissez un jeu</h3><p>Préparez Dark depuis votre bibliothèque InterArcade.</p></article><article><span>02</span><h3>Ouvrez la fenêtre de jeu</h3><p>Capturez-la dans le logiciel de streaming que vous utilisez déjà.</p></article><article><span>03</span><h3>Laissez le live agir</h3><p>Les interactions reçues par le Live Hub deviennent des actions dans la partie.</p></article></div></div></section>
+    <section id="jeux" class="games-section wrap"><div class="section-title split"><div><p class="eyebrow">LA BIBLIOTHÈQUE</p><h2>Des jeux faits pour le direct.</h2></div><p>Dark ouvre la collection. Les prochains titres arriveront dans la bibliothèque à mesure qu’ils seront prêts.</p></div><div class="site-games"><a class="site-game featured" href="/launcher"><img src="{{ url_for('static', filename='art/dark.svg') }}" alt="Dark, exploration dans un labyrinthe obscur"><div><span>DISPONIBLE</span><h3>Dark</h3><p>Traversez trois labyrinthes. Le public peut éclairer la route ou compliquer votre progression.</p><b>Découvrir Dark →</b></div></a><div class="site-game"><img src="{{ url_for('static', filename='art/marble.svg') }}" alt="Illustration de Marble"><div><span>BIENTÔT</span><h3>Marble</h3></div></div><div class="site-game"><img src="{{ url_for('static', filename='art/slot.svg') }}" alt="Illustration de Slot"><div><span>BIENTÔT</span><h3>Slot</h3></div></div><div class="site-game"><img src="{{ url_for('static', filename='art/fight.svg') }}" alt="Illustration de Fight"><div><span>BIENTÔT</span><h3>Fight</h3></div></div></div></section>
+    <section id="plateformes" class="platform-section"><div class="wrap platform-layout"><div><p class="eyebrow">OUVERT SUR VOTRE SETUP</p><h2>Votre logiciel de stream.<br>Votre façon de jouer.</h2><p>InterArcade ouvre une fenêtre de jeu redimensionnable que vous placez librement dans votre scène. Les plateformes Live arrivent comme sources au Live Hub ; les jeux restent indépendants de leur origine.</p></div><div class="platform-list"><div><strong>TikTok Live</strong><span>Disponible pour Dark</span></div><div><strong>Twitch</strong><span>Bientôt</span></div><div><strong>OBS · Streamlabs · TikTok LIVE Studio</strong><span>Capture de fenêtre</span></div></div></div></section>
+    <section id="telecharger" class="download-section wrap"><div><p class="eyebrow">PREMIER APERÇU</p><h2>Prêt à préparer votre partie ?</h2><p>Créez un compte pour explorer la bibliothèque et tester Dark sans live. Les installateurs Windows et Mac seront proposés ici après validation.</p><div class="button-row"><a class="button primary" href="/launcher">Créer un compte <span>↗</span></a><span class="download-state">Téléchargement Windows / Mac : bientôt</span></div></div><aside><span>Tarifs</span><strong>À venir</strong><p>Les accès par jeu, les ensembles de jeux et l’accès global seront présentés avant l’ouverture commerciale.</p></aside></section>
+  </main>
+  <footer class="site-footer wrap"><span class="wordmark">INTER<span>ARCADE</span></span><span>Le live entre dans la partie.</span><a href="/launcher">Espace créateur →</a></footer>
+</body>
+</html>

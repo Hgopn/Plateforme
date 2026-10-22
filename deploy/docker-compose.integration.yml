@@ -41,6 +41,8 @@ services:
       EULER_API_KEY: ${EULER_API_KEY}
       REDIS_URL: ${REDIS_URL}
       INTERARCADE_LOG_LEVEL: ${INTERARCADE_LOG_LEVEL}
+      INTERARCADE_TIKTOK_DARK_TRACE: ${INTERARCADE_TIKTOK_DARK_TRACE:-false}
+      INTERARCADE_DARK_TIKTOK_MAPPING_PATH: ${INTERARCADE_DARK_TIKTOK_MAPPING_PATH:-/app/config/dark_tiktok_mapping.json}
     volumes:
       - ..:/app
     command: ["gunicorn", "--worker-class", "geventwebsocket.gunicorn.workers.GeventWebSocketWorker", "--workers", "1", "--bind", "0.0.0.0:5000", "--timeout", "120", "--graceful-timeout", "30", "--keep-alive", "5", "app:app"]
@@ -49,6 +51,7 @@ services:
         condition: service_healthy
     ports:
       - "${INTERARCADE_BIND_HOST:-127.0.0.1}:15000:5000"
+      - "127.0.0.1:15001:5000"
 
   worker:
     build:
@@ -71,6 +74,7 @@ services:
       EULER_API_KEY: ${EULER_API_KEY}
       REDIS_URL: ${REDIS_URL}
       INTERARCADE_LOG_LEVEL: ${INTERARCADE_LOG_LEVEL}
+      INTERARCADE_TIKTOK_DARK_TRACE: ${INTERARCADE_TIKTOK_DARK_TRACE:-false}
     volumes:
       - ..:/app
     command: ["python", "-m", "interarcade.worker"]

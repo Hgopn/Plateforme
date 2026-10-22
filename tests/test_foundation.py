@@ -210,7 +210,8 @@ class FoundationTests(unittest.TestCase):
         actor, gift = normalize_gift(
             SimpleNamespace(user=user, gift=SimpleNamespace(name="Rose"), repeat_count=3)
         )
-        self.assertEqual((actor, gift), ("viewer", {"gift": "Rose", "count": 3}))
+        self.assertEqual(actor, "viewer")
+        self.assertEqual(gift, {"gift": "Rose", "count": 3, "repeat_count": 3})
 
     def test_marble_round_api_controls_score_and_session_end(self):
         app = create_app(MarbleDemoConfig)

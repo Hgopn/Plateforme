@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "follow_action": "PLAYER_HELP",
+  "likes": {
+    "threshold": 50,
+    "action": "LIGHT_BOOST"
+  },
+  "gifts": {
+    "value_basis": "total_diamonds",
+    "small_max": 9,
+    "medium_max": 99,
+    "small_action": "LIGHT_BOOST",
+    "medium_action": "PLAYER_HELP",
+    "large_action": "REVEAL_MAP",
+    "id_overrides": {},
+    "name_overrides": {
+      "rose": "LIGHT_BOOST",
+      "galaxy": "REVEAL_MAP"
+    }
+  }
+}

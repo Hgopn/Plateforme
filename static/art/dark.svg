@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1050" role="img" aria-label="Dark, labyrinthe éclairé autour du personnage">
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#23352b"/>
+      <stop offset="1" stop-color="#07110b"/>
+    </linearGradient>
+    <radialGradient id="lamp" gradientUnits="userSpaceOnUse" cx="460" cy="545" r="305">
+      <stop stop-color="#e8dba8" stop-opacity=".78"/>
+      <stop offset=".54" stop-color="#9bb994" stop-opacity=".31"/>
+      <stop offset="1" stop-color="#9bb994" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="visibility" gradientUnits="userSpaceOnUse" cx="460" cy="545" r="310">
+      <stop stop-color="#fff"/>
+      <stop offset=".68" stop-color="#fff"/>
+      <stop offset="1" stop-color="#000"/>
+    </radialGradient>
+    <mask id="lit-area">
+      <rect width="900" height="1050" fill="url(#visibility)"/>
+    </mask>
+    <pattern id="grain" width="72" height="72" patternUnits="userSpaceOnUse">
+      <circle cx="8" cy="15" r="2" fill="#a3b8a5" opacity=".08"/>
+      <circle cx="62" cy="51" r="2" fill="#aec0ad" opacity=".06"/>
+    </pattern>
+  </defs>
+  <rect width="900" height="1050" fill="url(#background)"/>
+  <rect width="900" height="1050" fill="url(#grain)"/>
+  <circle cx="460" cy="545" r="305" fill="url(#lamp)"/>
+  <g mask="url(#lit-area)">
+    <g fill="none" stroke="#839e88" stroke-width="30" stroke-linecap="square" opacity=".64">
+      <path d="M80 140H830M80 140V330H320V250H580V420H820M80 500H260V390H420V700H80M600 510H820V780H600V650H500M80 850H350V940H800M520 830H700M320 140V70M750 140V290M170 500V660M420 550H570"/>
+    </g>
+    <g fill="none" stroke="#102018" stroke-width="19" stroke-linecap="square">
+      <path d="M80 140H830M80 140V330H320V250H580V420H820M80 500H260V390H420V700H80M600 510H820V780H600V650H500M80 850H350V940H800M520 830H700M320 140V70M750 140V290M170 500V660M420 550H570"/>
+    </g>
+    <path d="M607 661l34-26 34 26-34 27z" fill="#d7a16d" stroke="#644b32" stroke-width="8"/>
+    <path d="M641 636v51" stroke="#f2cc9f" stroke-width="7"/>
+  </g>
+  <circle cx="460" cy="545" r="31" fill="#e8d9a2" opacity=".22"/>
+  <path d="M440 550l20-31 20 31-6 36h-28z" fill="#f4e4ad" stroke="#342d20" stroke-width="6"/>
+  <circle cx="460" cy="513" r="14" fill="#f3da9d" stroke="#342d20" stroke-width="5"/>
+  <path d="M436 568l-12 20m59-20 11 20" stroke="#f3da9d" stroke-width="8" stroke-linecap="round"/>
+</svg>

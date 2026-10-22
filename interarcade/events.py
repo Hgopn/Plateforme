@@ -11,7 +11,7 @@ from uuid import uuid4
 
 
 EVENT_SCHEMA_VERSION = 1
-SUPPORTED_TYPES = {"gift", "like", "comment", "share", "follow"}
+SUPPORTED_TYPES = {"gift", "like", "comment", "share", "follow", "action"}
 COUNT_TYPES = {"gift", "like", "share"}
 PLATFORM_PATTERN = re.compile(r"^[a-z][a-z0-9_-]*$")
 

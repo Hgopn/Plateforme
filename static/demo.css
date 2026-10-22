@@ -62,3 +62,7 @@ h3 { font-size: 18px; }
 @media (max-width: 430px) { .game-grid { grid-template-columns: 1fr; }.section-heading { align-items: start; display: block; }.section-heading .text-button { margin-top: 12px; padding-left: 0; } }
 .tiktok-config { background: #171713; border: 1px dashed var(--line); border-radius: 8px; padding: 12px; }.tiktok-config label { color: var(--muted); display: grid; font-size: 12px; gap: 5px; }.tiktok-config input { background: #10100e; border: 1px solid var(--line); border-radius: 6px; color: var(--text); margin-top: 5px; padding: 9px; }.tiktok-config .secondary-button { margin-top: 10px; padding: 9px; }
 .control-actions button:disabled { cursor: not-allowed; opacity: .52; }
+.dark-actions { display: none; }
+.dark-actions.visible { display: block; }
+.dark-actions .form-row { grid-template-columns: 1fr 1fr; }
+.dark-actions code { overflow-wrap: anywhere; user-select: all; }

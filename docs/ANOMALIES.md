@@ -35,3 +35,14 @@ of events for closed sessions.
 The resilience test intentionally produces database connection errors while
 PostgreSQL is stopped. `monitor.sh` may report those retained container log
 lines as a warning until the API and worker containers are recreated.
+
+## Productization integration — 2026-10-22
+
+The first integration run exposed a PostgreSQL-only failure in the new creator
+session lease query: a literal `%` inside `LIKE 'creator:%'` was parsed by
+psycopg as an invalid placeholder. The query now binds the pattern as a normal
+parameter. A direct PostgreSQL call, the full integration suite and the E2E
+restart journey passed after the fix. The earlier worker errors remain in the
+integration volume's `runtime_errors` table, so `monitor.sh` can continue to
+report a warning even while health and current worker heartbeats are good.
+This historical diagnostic data has not been deleted.

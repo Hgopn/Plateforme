@@ -1,0 +1,33 @@
+{
+  "name": "interarcade-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "InterArcade creator launcher",
+  "author": { "name": "InterArcade" },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check main.js && node --check preload.js && node --check offline.js && node --check configure-server.js && node --check verify-packaging.js",
+    "configure:server": "node configure-server.js",
+    "dist:win": "node verify-packaging.js && electron-builder --win nsis --publish never",
+    "dist:mac": "node verify-packaging.js && electron-builder --mac dmg zip --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.interarcade.launcher",
+    "productName": "InterArcade",
+    "files": ["main.js", "preload.js", "offline.html", "offline.css", "offline.js", "server.json", "package.json"],
+    "directories": { "output": "dist" },
+    "artifactName": "InterArcade-${version}-${os}-${arch}.${ext}",
+    "win": { "target": "nsis", "icon": "build/icon.png" },
+    "nsis": { "oneClick": false, "perMachine": false,
+      "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true,
+      "createStartMenuShortcut": true, "shortcutName": "InterArcade",
+      "uninstallDisplayName": "InterArcade" },
+    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.games",
+      "icon": "build/icon.png", "hardenedRuntime": true }
+  }
+}

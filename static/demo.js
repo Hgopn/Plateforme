@@ -89,6 +89,8 @@ async function launchGame(mode) {
     $("game-frame").src = `/games/${currentGame.id}/${currentGame.id}.html?${query}`;
     $("game-session").textContent = mode === "test" ? "Session de test active" : "Prêt pour TikTok";
     $("event-result").textContent = mode === "test" ? "Le jeu est prêt à recevoir des simulations." : (tiktokConfigured ? "Compte configuré — aucune connexion live réelle n’a été lancée." : "Configurez un compte TikTok de test avant une connexion réelle.");
+    $("dark-action-result").textContent = "";
+    $("dark-live-session-id").textContent = currentGame.id === "dark" ? session.session_id : "—";
   } catch (error) {
     $("game-session").textContent = "Session indisponible";
     $("event-result").textContent = "Impossible de créer la session locale.";
@@ -103,9 +105,11 @@ async function showGame(gameId) {
   $("game-frame").src = "about:blank";
   $("game-session").textContent = "Pas de session";
   $("event-result").textContent = "";
+  $("dark-live-session-id").textContent = "—";
   tiktokConfigured = false;
   $("tiktok-account-status").textContent = "Non configuré";
   $("marble-settings").classList.toggle("visible", currentGame.id === "marble");
+  $("dark-actions").classList.toggle("visible", currentGame.id === "dark");
   $("launch-tiktok").disabled = currentGame.id === "dark";
   $("launch-tiktok").textContent = currentGame.id === "dark"
     ? "Live TikTok après validation"
@@ -140,12 +144,34 @@ async function sendEvent() {
   $("event-result").textContent = response.ok ? `✓ ${type} envoyé à ${currentGame.name}` : "Événement refusé";
 }
 
+async function sendDarkAction() {
+  if (!session || currentGame?.id !== "dark") {
+    $("dark-action-result").textContent = "Démarrez d’abord Dark avec « Tester le jeu ».";
+    return;
+  }
+  const actionType = $("dark-action-type").value;
+  const response = await fetch("/api/v1/demo/dark/actions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.token}` },
+    body: JSON.stringify({
+      session_id: session.session_id,
+      action_type: actionType,
+      source_platform: $("dark-action-platform").value,
+      actor_username: $("dark-action-actor").value.trim() || "demo-viewer",
+    }),
+  });
+  $("dark-action-result").textContent = response.ok
+    ? `✓ ${actionType} envoyé à Dark`
+    : "Action refusée";
+}
+
 $("refresh-status").addEventListener("click", refreshStatus);
 $("back-button").addEventListener("click", async () => { await endCurrentSession(); setView("library"); });
 $("test-game").addEventListener("click", () => launchGame("test"));
 $("launch-tiktok").addEventListener("click", () => launchGame("tiktok"));
 $("configure-tiktok").addEventListener("click", configureTikTok);
 $("send-event").addEventListener("click", sendEvent);
+$("send-dark-action").addEventListener("click", sendDarkAction);
 $("event-type").addEventListener("change", () => { $("gift-field").style.display = $("event-type").value === "gift" ? "grid" : "none"; });
 renderCards(); bindNavigation(); refreshStatus(); setInterval(refreshStatus, 10000);
 const requestedGame = window.location.hash.slice(1);

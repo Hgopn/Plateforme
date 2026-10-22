@@ -21,15 +21,16 @@ three cave labyrinths measuring 10×10, 15×15, and 20×20 cells.
   ingress. It does not start a TikTok listener.
 - The local launcher can open the Dark card directly at `/#dark`. The creator
   then selects **Tester le jeu** to start a Test session.
-- The Dark Live action stays disabled until credentials and a dedicated test
-  account are available for a real transport validation.
+- The Dark real TikTok launch stays disabled until credentials and a dedicated
+  test account are available. Local actions can be simulated from the launcher;
+  see [DARK_LIVE_ACTIONS.md](DARK_LIVE_ACTIONS.md).
 
 ## Live compatibility
 
 Dark receives the versioned `ia:event` envelope and exposes it to the client
-as the browser event `interarcade:event`. The first three levels do not change
-gameplay in response to audience events. Future mappings can consume that
-provider-neutral contract without importing TikTok behavior into Dark.
+as the browser event `interarcade:event`. The five optional visual live effects
+consume only normalized `ia:action` messages. Future provider mappings can
+produce these actions without changing Dark or its three server-owned maps.
 
 ## Out of scope
 

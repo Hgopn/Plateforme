@@ -1,6 +1,14 @@
 "use strict";
 
-const params = new URLSearchParams(window.location.search);
+// The product launcher puts the short-lived game token in the URL fragment so
+// it never enters access logs or Referer headers. Query parameters remain for
+// the local pilot and existing test tools.
+const params = new URLSearchParams((window.location.hash || "").slice(1)
+  || (window.location.search || "").slice(1));
+if (document.body) {
+  document.body.classList.toggle("broadcast", params.get("broadcast") === "1");
+  document.body.classList.toggle("test-mode", params.get("mode") === "test");
+}
 const SESSION_ID = params.get("session_id") || "";
 const TOKEN = params.get("token") || "";
 const canvas = document.getElementById("game-canvas");
@@ -14,10 +22,28 @@ const objectiveText = document.getElementById("objective-text");
 const moveCount = document.getElementById("move-count");
 const message = document.getElementById("message");
 const errorPanel = document.getElementById("error-panel");
+const liveActionNotice = document.getElementById("live-action-notice");
+const liveHelp = document.getElementById("live-help");
 // Visual tuning only; the server still decides which grid steps are valid.
 const DARK_VISUALS = Object.freeze({
   lightRadiusTiles: 1.25,
+  lightIntensity: 1,
+  lightSoftness: .27,
+  outsideOpacity: 1,
   moveSpeedCellsPerSecond: 8,
+});
+const DARK_ACTION_UI = Object.freeze({
+  showNotices: params.get("live_notices") !== "0",
+  noticeMs: 2600,
+});
+let showLiveNotices = DARK_ACTION_UI.showNotices;
+const liveActions = createDarkActionState();
+const liveActionLabels = Object.freeze({
+  LIGHT_BOOST: "a agrandi la lumière",
+  LIGHT_REDUCE: "a réduit la lumière",
+  REVEAL_MAP: "a révélé la zone",
+  PLAYER_HELP: "a indiqué la sortie",
+  PLAYER_HINDER: "a ralenti le joueur",
 });
 const playerSprites = Object.fromEntries(["down", "up", "left", "right"].map((direction) => {
   const sprite = new Image();
@@ -33,6 +59,7 @@ let visualPlayer = { x: 1, y: 1 };
 let visualWaypoints = [];
 let walkPhase = 0;
 let messageTimer = null;
+let liveNoticeTimer = null;
 let lastFrame = performance.now();
 let heldDirection = null;
 let holdCanRepeat = false;
@@ -80,6 +107,7 @@ function setState(nextState, outcome = null, snap = false) {
     && state.status === nextState.status;
   const changedLevel = state && state.level !== nextState.level;
   state = nextState;
+  if (resetTransition || nextState.status === "finished") liveActions.clear();
   if (changedLevel || resetTransition) stopHolding();
   if (snap || changedLevel || resetTransition) {
     visualWaypoints = [];
@@ -206,8 +234,9 @@ function drawPlayer(centerX, centerY, tile, direction, walking) {
   context.restore();
 }
 
-function advanceVisualPlayer(delta) {
-  let remaining = DARK_VISUALS.moveSpeedCellsPerSecond * delta / 1000;
+function advanceVisualPlayer(delta, effects = liveActions.snapshot()) {
+  const speed = DARK_VISUALS.moveSpeedCellsPerSecond * (effects.hinder ? .7 : 1);
+  let remaining = speed * delta / 1000;
   let travelled = 0;
   let direction = facing;
   while (remaining > 0 && visualWaypoints.length) {
@@ -235,7 +264,8 @@ function advanceVisualPlayer(delta) {
 function render(time) {
   const delta = Math.min(32, time - lastFrame);
   lastFrame = time;
-  const motion = advanceVisualPlayer(Math.max(0, delta));
+  const effects = liveActions.snapshot();
+  const motion = advanceVisualPlayer(Math.max(0, delta), effects);
   if (heldDirection && holdCanRepeat && !movePending && !visualWaypoints.length) {
     move(heldDirection);
   }
@@ -246,6 +276,7 @@ function render(time) {
   context.fillStyle = "#020403";
   context.fillRect(0, 0, width, height);
   if (!state) {
+    liveHelp.classList.remove("visible");
     requestAnimationFrame(render);
     return;
   }
@@ -267,25 +298,58 @@ function render(time) {
   });
 
   const flicker = Math.sin(time * .0067) * 2.5 + Math.sin(time * .017) * 1.2;
-  const lightRadius = tile * DARK_VISUALS.lightRadiusTiles + flicker;
+  const lightRadius = tile * DARK_VISUALS.lightRadiusTiles * effects.lightScale + flicker;
   lightContext.clearRect(0, 0, width, height);
-  lightContext.save();
-  lightContext.fillStyle = "rgba(0, 2, 1, .965)";
-  lightContext.fillRect(0, 0, width, height);
-  lightContext.globalCompositeOperation = "destination-out";
-  const light = lightContext.createRadialGradient(centerX, centerY, tile * .18, centerX, centerY, lightRadius);
-  light.addColorStop(0, "rgba(0, 0, 0, 1)");
-  light.addColorStop(.54, "rgba(0, 0, 0, .82)");
-  light.addColorStop(1, "rgba(0, 0, 0, 0)");
-  lightContext.fillStyle = light;
-  lightContext.beginPath();
-  lightContext.arc(centerX, centerY, lightRadius, 0, Math.PI * 2);
-  lightContext.fill();
-  lightContext.restore();
-  context.drawImage(lightCanvas, 0, 0, width, height);
+  if (!effects.reveal) {
+    lightContext.save();
+    // A fully opaque outside prevents walls and the exit from revealing the map.
+    // The gradient cuts a soft opening in that cover; it does not tint the map.
+    lightContext.fillStyle = `rgba(1, 4, 2, ${DARK_VISUALS.outsideOpacity})`;
+    lightContext.fillRect(0, 0, width, height);
+    lightContext.globalCompositeOperation = "destination-out";
+    const light = lightContext.createRadialGradient(centerX, centerY, 0, centerX, centerY, lightRadius);
+    light.addColorStop(0, `rgba(0, 0, 0, ${DARK_VISUALS.lightIntensity})`);
+    light.addColorStop(1 - DARK_VISUALS.lightSoftness, `rgba(0, 0, 0, ${DARK_VISUALS.lightIntensity})`);
+    light.addColorStop(1, "rgba(0, 0, 0, 0)");
+    lightContext.fillStyle = light;
+    lightContext.beginPath();
+    lightContext.arc(centerX, centerY, lightRadius, 0, Math.PI * 2);
+    lightContext.fill();
+    lightContext.restore();
+    context.drawImage(lightCanvas, 0, 0, width, height);
+  }
+  if (effects.help && state.status === "active") {
+    liveHelp.textContent = `Sortie ${exitDirection(state.map.exit, state.player)}`;
+    liveHelp.classList.add("visible");
+  } else liveHelp.classList.remove("visible");
   drawPlayer(centerX, centerY, tile, motion.direction, motion.walking);
   requestAnimationFrame(render);
 }
+
+function exitDirection(exit, player) {
+  const angle = Math.atan2(exit.y - player.y, exit.x - player.x);
+  return ["→", "↘", "↓", "↙", "←", "↖", "↑", "↗"]
+    [Math.round(angle / (Math.PI / 4) + 8) % 8];
+}
+
+function receiveLiveAction(action) {
+  if (action?.session_id !== SESSION_ID || state?.status !== "active" || !liveActions.apply(action)) return;
+  window.dispatchEvent(new CustomEvent("interarcade:action", { detail: action }));
+  if (!showLiveNotices) return;
+  const platform = action.source_platform;
+  const platformLabel = platform.charAt(0).toUpperCase() + platform.slice(1);
+  liveActionNotice.textContent = `${action.actor_username} · ${platformLabel} ${liveActionLabels[action.action_type]}`;
+  liveActionNotice.classList.add("visible");
+  window.clearTimeout(liveNoticeTimer);
+  liveNoticeTimer = window.setTimeout(() => liveActionNotice.classList.remove("visible"), DARK_ACTION_UI.noticeMs);
+}
+
+window.addEventListener("message", (event) => {
+  if (event.origin !== window.location.origin || event.source !== window.opener
+      || event.data?.type !== "ia:overlay" || typeof event.data.enabled !== "boolean") return;
+  showLiveNotices = event.data.enabled;
+  if (!showLiveNotices) liveActionNotice.classList.remove("visible");
+});
 
 async function move(direction) {
   if (movePending || visualWaypoints.length || !state || state.status !== "active") return;
@@ -339,6 +403,7 @@ function connectEvents() {
       if (state?.status === "active") sessionState.textContent = "Session active";
     }, 900);
   });
+  socket.on("ia:action", receiveLiveAction);
 }
 
 async function start() {

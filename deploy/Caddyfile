@@ -1,0 +1,14 @@
+{
+    email {$INTERARCADE_TLS_EMAIL}
+}
+
+{$INTERARCADE_DOMAIN} {
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+    reverse_proxy api:5000
+}
