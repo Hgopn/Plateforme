@@ -8,6 +8,7 @@ const errors = {
   invalid_credentials: "Email ou mot de passe incorrect.",
   email_already_registered: "Cette adresse possède déjà un compte.",
   invalid_registration: "Saisissez un email valide et un mot de passe d'au moins 12 caractères.",
+  too_many_attempts: "Trop de tentatives. Patientez quinze minutes avant de réessayer.",
   invalid_tiktok_username: "Saisissez un pseudo TikTok valide.",
   license_required: "Une licence Dark est nécessaire pour lancer un vrai live. Le mode Test est disponible.",
   tiktok_not_configured: "Enregistrez votre @pseudo TikTok avant de lancer le Live.",

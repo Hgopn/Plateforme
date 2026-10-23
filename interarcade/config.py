@@ -40,6 +40,7 @@ class Config:
     GIT_VERSION = os.getenv("INTERARCADE_GIT_VERSION", "unknown")
     DEMO_MODE = _bool("INTERARCADE_DEMO_MODE", False)
     COOKIE_SECURE = _bool("INTERARCADE_COOKIE_SECURE", False)
+    TRUST_PROXY_CLIENT_IP = _bool("INTERARCADE_TRUST_PROXY_CLIENT_IP", False)
     DEMO_TENANT_ID = os.getenv("INTERARCADE_DEMO_TENANT_ID", "demo-creator")
     DEMO_USERNAME = os.getenv("INTERARCADE_DEMO_USERNAME", "demo-creator")
     PORT = int(os.getenv("PORT", "5000"))

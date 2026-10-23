@@ -67,11 +67,23 @@ def create_app(config_class=Config):
     app.extensions["database"] = database
     app.extensions["broker"] = broker
     app.extensions["dark_tiktok_mapping"] = dark_tiktok_mapping
+    app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
 
     @app.after_request
     def secure_response(response):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
+        game_asset = request.path.startswith("/games/")
+        frame_ancestors = "'self'" if game_asset else "'none'"
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN" if game_asset else "DENY")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; base-uri 'none'; object-src 'none'; "
+            f"frame-ancestors {frame_ancestors}; "
+            "form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+            "connect-src 'self' ws: wss:; frame-src 'self'",
+        )
         if request.path.startswith("/api/v1/creator/"):
             response.headers["Cache-Control"] = "no-store"
         return response
@@ -107,7 +119,28 @@ def create_app(config_class=Config):
 
     def same_site_request():
         origin = request.headers.get("Origin")
-        return not origin or urlparse(origin).netloc == request.host
+        if not origin:
+            return True
+        parsed = urlparse(origin)
+        expected_scheme = "https" if config_class.COOKIE_SECURE else request.scheme
+        return parsed.scheme == expected_scheme and parsed.netloc == request.host
+
+    def auth_limit(scope, subject, limit):
+        key = hmac.new(app.config["SESSION_SECRET"].encode(),
+                       f"{scope}:{subject}".encode(), hashlib.sha256).hexdigest()
+        return database.consume_auth_limit(key, limit, 15 * 60)
+
+    def auth_attempt_allowed(action, email=None):
+        client_ip = (request.headers.get("X-InterArcade-Client-IP")
+                     if config_class.TRUST_PROXY_CLIENT_IP else None) or request.remote_addr or "unknown"
+        if not auth_limit(f"{action}:ip", client_ip, 30 if action == "login" else 10):
+            return False
+        return not email or auth_limit(f"{action}:email", email, 10 if action == "login" else 5)
+
+    def auth_throttled():
+        response = jsonify({"error": "too_many_attempts"})
+        response.headers["Retry-After"] = "900"
+        return response, 429
 
     def set_creator_cookie(response, account_id, remember):
         token = secrets.token_urlsafe(32)
@@ -283,7 +316,7 @@ def create_app(config_class=Config):
         try:
             database_ok = database.ping()
         except Exception as exc:
-            logger.error("database healthcheck failed", exc_info=exc, extra={"component": "database"})
+            logger.error("database healthcheck failed", extra={"component": "database", "error_type": type(exc).__name__})
         broker_ok = broker.ping()
         workers = []
         heartbeat = {"ok": False, "worker_id": None, "pid": None, "updated_at": None}
@@ -293,7 +326,7 @@ def create_app(config_class=Config):
                 heartbeat = database.worker_heartbeat(config_class.WORKER_HEARTBEAT_TIMEOUT_SECONDS)
             except Exception as exc:
                 database_ok = False
-                logger.error("database detail healthcheck failed", exc_info=exc, extra={"component": "database"})
+                logger.error("database detail healthcheck failed", extra={"component": "database", "error_type": type(exc).__name__})
         worker_ok = all(row.get("status") != "error" for row in workers)
         if config_class.REQUIRE_WORKER_HEARTBEAT:
             worker_ok = worker_ok and heartbeat["ok"]
@@ -340,6 +373,8 @@ def create_app(config_class=Config):
         data = data if isinstance(data, dict) else {}
         email = normalize_email(data.get("email"))
         password = data.get("password")
+        if not auth_attempt_allowed("register", email):
+            return auth_throttled()
         if not email or not valid_password(password):
             return jsonify({"error": "invalid_registration"}), 400
         account_id = secrets.token_urlsafe(18)
@@ -362,9 +397,14 @@ def create_app(config_class=Config):
         data = data if isinstance(data, dict) else {}
         email = normalize_email(data.get("email"))
         password = data.get("password")
+        if not auth_attempt_allowed("login", email):
+            return auth_throttled()
         account = database.creator_account_by_email(email) if email else None
-        if not isinstance(password, str) or not account or not account["enabled"] \
-                or not check_password(password, account["password_hash"]):
+        # Run the same password work for unknown and disabled accounts.
+        dummy_hash = "pbkdf2_sha256$600000$00000000000000000000000000000000$" + "00" * 32
+        password_ok = check_password(password, account["password_hash"] if account else dummy_hash) \
+            if valid_password(password) else False
+        if not account or not account["enabled"] or not password_ok:
             return jsonify({"error": "invalid_credentials"}), 401
         response = jsonify(creator_summary(account))
         response, csrf = set_creator_cookie(response, account["id"], data.get("remember") is True)
@@ -944,7 +984,7 @@ def create_app(config_class=Config):
             sessions = database.session_summary() if database_health else {}
             recent_errors = database.recent_errors() if database_health else []
         except Exception as exc:
-            logger.error("diagnostics database check failed", exc_info=exc, extra={"component": "database"})
+            logger.error("diagnostics database check failed", extra={"component": "database", "error_type": type(exc).__name__})
             database_health = False
             worker_health = {"ok": False, "error": "database_unavailable"}
             listeners, live_sources, sessions, recent_errors = [], [], {}, []

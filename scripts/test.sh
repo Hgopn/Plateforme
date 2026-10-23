@@ -14,5 +14,6 @@ node --check static/launcher.js
 node --check desktop/main.js
 node tests/test_dark_client.js
 node tests/test_launcher_client.js
+node tests/test_desktop_security.js
 git diff --check
 echo "InterArcade integration tests passed"

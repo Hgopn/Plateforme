@@ -1,8 +1,8 @@
 FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt && useradd --system --uid 10001 interarcade
+COPY requirements.production.lock /app/requirements.production.lock
+RUN pip install --no-cache-dir -r /app/requirements.production.lock && useradd --system --uid 10001 interarcade
 COPY . /app
 USER interarcade
 CMD ["gunicorn", "--worker-class", "geventwebsocket.gunicorn.workers.GeventWebSocketWorker", "--workers", "1", "--bind", "0.0.0.0:5000", "--timeout", "120", "--graceful-timeout", "30", "app:app"]

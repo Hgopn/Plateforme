@@ -116,7 +116,7 @@ jeton interne d'événements.
    mot de passe PostgreSQL et l'origine HTTPS. Ne jamais
    commiter ce fichier. Définir le DNS avant le démarrage de Caddy.
 2. Exécuter `python3 scripts/production_preflight.py .env.production` puis
-   `docker compose --env-file .env.production -f deploy/docker-compose.production.yml config`.
+   `docker compose --env-file .env.production -f deploy/docker-compose.production.yml config --quiet`.
    Le contrôle valide la forme des secrets et du domaine ; il ne prouve pas la
    résolution DNS ni la validité du certificat.
 3. Avant chaque mise à jour, exécuter `bash scripts/backup_production.sh` et

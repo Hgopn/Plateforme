@@ -15,6 +15,7 @@ services:
     environment:
       INTERARCADE_DOMAIN: ${INTERARCADE_DOMAIN}
       INTERARCADE_TLS_EMAIL: ${INTERARCADE_TLS_EMAIL}
+      INTERARCADE_HSTS_MAX_AGE: ${INTERARCADE_HSTS_MAX_AGE:-0}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -22,6 +23,7 @@ services:
     depends_on:
       api:
         condition: service_started
+    networks: [frontend]
 
   api:
     build:
@@ -29,12 +31,22 @@ services:
       dockerfile: Dockerfile.production
     restart: unless-stopped
     logging: *bounded-json-logs
-    env_file: ../.env.production
     environment:
+      INTERARCADE_SECRET_KEY: ${INTERARCADE_SECRET_KEY}
+      INTERARCADE_SESSION_SECRET: ${INTERARCADE_SESSION_SECRET}
+      INTERARCADE_ADMIN_TOKEN: ${INTERARCADE_ADMIN_TOKEN}
+      INTERARCADE_INTERNAL_EVENT_TOKEN: ${INTERARCADE_INTERNAL_EVENT_TOKEN}
+      INTERARCADE_OBSERVER_TOKEN: ${INTERARCADE_OBSERVER_TOKEN}
+      INTERARCADE_ALLOWED_ORIGINS: ${INTERARCADE_ALLOWED_ORIGINS}
+      INTERARCADE_REQUIRE_WORKER_HEARTBEAT: ${INTERARCADE_REQUIRE_WORKER_HEARTBEAT}
+      INTERARCADE_CREATOR_SESSION_LEASE_SECONDS: ${INTERARCADE_CREATOR_SESSION_LEASE_SECONDS}
+      INTERARCADE_LOG_LEVEL: ${INTERARCADE_LOG_LEVEL}
+      INTERARCADE_GIT_VERSION: ${INTERARCADE_GIT_VERSION}
       DATABASE_URL: postgresql://interarcade:${INTERARCADE_DB_PASSWORD}@postgres:5432/interarcade
       REDIS_URL: redis://redis:6379/0
       INTERARCADE_API_URL: http://api:5000
       INTERARCADE_COOKIE_SECURE: "true"
+      INTERARCADE_TRUST_PROXY_CLIENT_IP: "true"
       INTERARCADE_DEMO_MODE: "false"
       HOST: 0.0.0.0
     healthcheck:
@@ -47,6 +59,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks: [frontend, backend]
 
   worker:
     build:
@@ -55,8 +68,11 @@ services:
     restart: unless-stopped
     logging: *bounded-json-logs
     command: ["python", "-m", "interarcade.worker"]
-    env_file: ../.env.production
     environment:
+      INTERARCADE_INTERNAL_EVENT_TOKEN: ${INTERARCADE_INTERNAL_EVENT_TOKEN}
+      INTERARCADE_LOG_LEVEL: ${INTERARCADE_LOG_LEVEL}
+      INTERARCADE_CREATOR_SESSION_LEASE_SECONDS: ${INTERARCADE_CREATOR_SESSION_LEASE_SECONDS}
+      EULER_API_KEY: ${EULER_API_KEY:-}
       DATABASE_URL: postgresql://interarcade:${INTERARCADE_DB_PASSWORD}@postgres:5432/interarcade
       REDIS_URL: redis://redis:6379/0
       INTERARCADE_API_URL: http://api:5000
@@ -64,6 +80,13 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,sys; from interarcade.database import Database; sys.exit(0 if Database(os.environ['DATABASE_URL']).worker_heartbeat(30)['ok'] else 1)"]
+      interval: 20s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    networks: [backend, egress]
 
   postgres:
     image: postgres:17.11-alpine3.24
@@ -71,15 +94,18 @@ services:
     logging: *bounded-json-logs
     environment:
       POSTGRES_DB: interarcade
-      POSTGRES_USER: interarcade
-      POSTGRES_PASSWORD: ${INTERARCADE_DB_PASSWORD}
+      POSTGRES_USER: interarcade_admin
+      POSTGRES_PASSWORD: ${INTERARCADE_DB_ADMIN_PASSWORD}
+      INTERARCADE_DB_PASSWORD: ${INTERARCADE_DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/01-interarcade.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U interarcade -d interarcade"]
+      test: ["CMD-SHELL", "pg_isready -U interarcade_admin -d interarcade"]
       interval: 10s
       timeout: 5s
       retries: 6
+    networks: [backend]
 
   redis:
     image: redis:7.4.6-alpine
@@ -91,6 +117,13 @@ services:
       interval: 10s
       timeout: 3s
       retries: 6
+    networks: [backend]
+
+networks:
+  frontend:
+  backend:
+    internal: true
+  egress:
 
 volumes:
   postgres_data:

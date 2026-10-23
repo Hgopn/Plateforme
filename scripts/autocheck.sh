@@ -28,5 +28,6 @@ node --check static/launcher.js
 node --check desktop/main.js
 node tests/test_dark_client.js
 node tests/test_launcher_client.js
+node tests/test_desktop_security.js
 git diff --check
 echo '{"status":"ok","checks":"monitor,health,pytest,ruff,bandit,javascript,git-diff"}'

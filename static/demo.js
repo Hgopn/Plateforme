@@ -27,7 +27,7 @@ function bindNavigation() {
 }
 
 function card(game) {
-  return `<article class="game-card" style="--card-color:${game.color}"><div class="game-icon">${game.icon}</div><h3>${game.name}</h3><p>${game.description}</p><button class="open-button" data-game="${game.id}">Voir la fiche →</button></article>`;
+  return `<article class="game-card game-card-${game.id}"><div class="game-icon">${game.icon}</div><h3>${game.name}</h3><p>${game.description}</p><button class="open-button" data-game="${game.id}">Voir la fiche →</button></article>`;
 }
 
 function renderCards() {

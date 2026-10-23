@@ -12,3 +12,13 @@ __pycache__
 *.log
 desktop/node_modules
 desktop/dist
+*.pem
+*.p12
+*.pfx
+*.key
+*.crt
+*.dump
+*.sqlite
+*.sqlite3
+.npmrc
+backups

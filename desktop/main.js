@@ -1,6 +1,6 @@
 "use strict";
 
-const { app, BrowserWindow, dialog, ipcMain } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, session } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -8,6 +8,9 @@ function serverOrigin() {
   const file = path.join(__dirname, "server.json");
   const configured = process.env.INTERARCADE_SERVER_URL || JSON.parse(fs.readFileSync(file, "utf8")).serverUrl;
   const url = new URL(configured);
+  if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+    throw new Error("InterArcade requires a server origin without credentials or a path");
+  }
   if (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))) {
     throw new Error("InterArcade requires HTTPS for remote servers");
   }
@@ -59,8 +62,14 @@ function createMainWindow() {
     child.webContents.on("will-navigate", (event, url) => {
       if (!permitted(url, true)) event.preventDefault();
     });
+    child.webContents.on("will-redirect", (event, url) => {
+      if (!permitted(url, true)) event.preventDefault();
+    });
   });
   main.webContents.on("will-navigate", (event, url) => {
+    if (!permitted(url)) event.preventDefault();
+  });
+  main.webContents.on("will-redirect", (event, url) => {
     if (!permitted(url)) event.preventDefault();
   });
   main.webContents.on("did-fail-load", (_event, code, _description, _url, mainFrame) => {
@@ -73,6 +82,11 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
+  app.on("web-contents-created", (_event, contents) => {
+    contents.on("will-attach-webview", (event) => event.preventDefault());
+  });
   if (origin) createMainWindow();
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0 && origin) createMainWindow(); });
 });

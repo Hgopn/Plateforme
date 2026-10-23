@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "InterArcade creator launcher",
-  "author": { "name": "InterArcade" },
+  "author": {
+    "name": "InterArcade"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -13,21 +15,46 @@
     "dist:mac": "node verify-packaging.js && electron-builder --mac dmg zip --publish never"
   },
   "devDependencies": {
-    "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
+    "electron": "45.0.0",
+    "electron-builder": "26.15.3"
   },
   "build": {
     "appId": "com.interarcade.launcher",
     "productName": "InterArcade",
-    "files": ["main.js", "preload.js", "offline.html", "offline.css", "offline.js", "server.json", "package.json"],
-    "directories": { "output": "dist" },
+    "files": [
+      "main.js",
+      "preload.js",
+      "offline.html",
+      "offline.css",
+      "offline.js",
+      "server.json",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
     "artifactName": "InterArcade-${version}-${os}-${arch}.${ext}",
-    "win": { "target": "nsis", "icon": "build/icon.png" },
-    "nsis": { "oneClick": false, "perMachine": false,
-      "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true,
-      "createStartMenuShortcut": true, "shortcutName": "InterArcade",
-      "uninstallDisplayName": "InterArcade" },
-    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.games",
-      "icon": "build/icon.png", "hardenedRuntime": true }
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "InterArcade",
+      "uninstallDisplayName": "InterArcade"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.games",
+      "icon": "build/icon.png",
+      "hardenedRuntime": true
+    }
   }
 }

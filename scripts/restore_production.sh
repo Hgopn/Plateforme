@@ -11,6 +11,6 @@ cd "$ROOT_DIR"
 BACKUP_FILE="$(realpath "$2")"
 docker compose --env-file .env.production -f deploy/docker-compose.production.yml stop api worker
 docker compose --env-file .env.production -f deploy/docker-compose.production.yml exec -T postgres \
-  pg_restore -U interarcade -d interarcade --clean --if-exists --no-owner < "$BACKUP_FILE"
+  pg_restore -U interarcade_admin -d interarcade --role=interarcade --clean --if-exists --no-owner < "$BACKUP_FILE"
 docker compose --env-file .env.production -f deploy/docker-compose.production.yml up -d api worker
 echo "Restore completed; verify /health/ready and diagnostics before reopening access."

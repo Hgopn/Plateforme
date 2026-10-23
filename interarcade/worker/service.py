@@ -50,16 +50,16 @@ class WorkerService:
             },
             method="POST",
         )
-        last_error = None
+        last_error_type = "UnknownError"
         for attempt in range(3):
             try:
                 with urllib.request.urlopen(request, timeout=10) as response:  # nosec B310
                     if 200 <= response.status < 300:
                         return
             except Exception as exc:
-                last_error = exc
+                last_error_type = type(exc).__name__
                 time.sleep(2**attempt)
-        raise RuntimeError(f"event delivery failed: {last_error}")
+        raise RuntimeError(f"event delivery failed: {last_error_type}")
 
     def _start(self, row):
         source_id = row["id"]
@@ -119,9 +119,10 @@ class WorkerService:
                     else:
                         self.database.update_live_source(row["id"], "stopped")
             except Exception as exc:
-                self.database.update_live_source(row["id"], "error", str(exc))
-                self.database.record_error("worker", str(exc), {"source_id": row["id"]})
-                self.logger.exception("live source startup failed")
+                error_type = type(exc).__name__
+                self.database.update_live_source(row["id"], "error", error_type)
+                self.database.record_error("worker", error_type, {"source_id": row["id"]})
+                self.logger.error("live source startup failed", extra={"error_type": error_type})
 
     def run_forever(self):
         signal.signal(signal.SIGTERM, self._request_stop)
@@ -131,11 +132,14 @@ class WorkerService:
                 self._heartbeat()
                 self.run_once()
             except Exception as exc:
-                self.logger.exception("worker supervisor iteration failed")
+                error_type = type(exc).__name__
+                self.logger.error("worker supervisor iteration failed", extra={"error_type": error_type})
                 try:
-                    self.database.record_error("worker", str(exc))
+                    self.database.record_error("worker", error_type)
                 except Exception as record_error:
-                    self.logger.warning("could not persist worker error: %s", record_error)
+                    self.logger.warning("could not persist worker error", extra={
+                        "error_type": type(record_error).__name__,
+                    })
             time.sleep(self.config.WORKER_POLL_SECONDS)
         for worker in list(self.workers.values()):
             worker.stop()

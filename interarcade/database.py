@@ -50,6 +50,14 @@ SCHEMA = (
     """,
     "CREATE INDEX IF NOT EXISTS creator_logins_account_idx ON creator_logins (account_id)",
     """
+    CREATE TABLE IF NOT EXISTS auth_rate_limits (
+        key_hash TEXT PRIMARY KEY,
+        window_start TEXT NOT NULL,
+        attempts INTEGER NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS auth_rate_limits_window_idx ON auth_rate_limits (window_start)",
+    """
     CREATE TABLE IF NOT EXISTS creator_platform_accounts (
         account_id TEXT NOT NULL,
         platform TEXT NOT NULL,
@@ -400,6 +408,27 @@ class Database:
 
     def revoke_creator_login(self, token_hash: str):
         self.execute("UPDATE creator_logins SET revoked_at = ? WHERE token_hash = ?", (now(), token_hash))
+
+    def consume_auth_limit(self, key_hash: str, limit: int, window_seconds: int) -> bool:
+        """Count an authentication attempt atomically across API processes."""
+        timestamp = datetime.now(timezone.utc)
+        start = timestamp.isoformat()
+        cutoff = (timestamp - timedelta(seconds=window_seconds)).isoformat()
+        with self.connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(self._sql(
+                "INSERT INTO auth_rate_limits (key_hash, window_start, attempts) VALUES (?, ?, 1) "
+                "ON CONFLICT(key_hash) DO UPDATE SET "
+                "attempts = CASE WHEN auth_rate_limits.window_start <= ? THEN 1 "
+                "ELSE auth_rate_limits.attempts + 1 END, "
+                "window_start = CASE WHEN auth_rate_limits.window_start <= ? THEN excluded.window_start "
+                "ELSE auth_rate_limits.window_start END RETURNING attempts"
+            ), (key_hash, start, cutoff, cutoff))
+            attempts = cursor.fetchone()[0]
+            # Bound persisted keys even when public clients rotate addresses.
+            cursor.execute(self._sql("DELETE FROM auth_rate_limits WHERE window_start < ?"),
+                           ((timestamp - timedelta(days=1)).isoformat(),))
+            return attempts <= limit
 
     def configure_creator_platform(self, account_id: str, platform: str, username: str):
         source_account_id = username.casefold()

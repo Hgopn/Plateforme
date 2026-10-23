@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sys
 import ipaddress
+import re
+import stat
 from pathlib import Path
 
 from dotenv import dotenv_values
@@ -12,7 +14,9 @@ from dotenv import dotenv_values
 def validate(values: dict) -> list[str]:
     issues = []
     domain = (values.get("INTERARCADE_DOMAIN") or "").strip()
-    if not domain or "example.com" in domain or "://" in domain or "/" in domain:
+    if "example.com" in domain or not re.fullmatch(
+        r"(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}", domain
+    ):
         issues.append("INTERARCADE_DOMAIN must be the real DNS hostname")
     if values.get("INTERARCADE_ALLOWED_ORIGINS") != f"https://{domain}":
         issues.append("INTERARCADE_ALLOWED_ORIGINS must match the HTTPS domain")
@@ -27,7 +31,7 @@ def validate(values: dict) -> list[str]:
     names = (
         "INTERARCADE_SECRET_KEY", "INTERARCADE_SESSION_SECRET", "INTERARCADE_ADMIN_TOKEN",
         "INTERARCADE_INTERNAL_EVENT_TOKEN", "INTERARCADE_OBSERVER_TOKEN",
-        "INTERARCADE_DB_PASSWORD",
+        "INTERARCADE_DB_PASSWORD", "INTERARCADE_DB_ADMIN_PASSWORD",
     )
     secrets = []
     for name in names:
@@ -37,8 +41,12 @@ def validate(values: dict) -> list[str]:
         secrets.append(value)
     if len(set(secrets)) != len(secrets):
         issues.append("Production secrets must be distinct")
+    if not re.fullmatch(r"[A-Za-z0-9._~-]{32,}", values.get("INTERARCADE_DB_PASSWORD") or ""):
+        issues.append("INTERARCADE_DB_PASSWORD must be URL-safe for the database connection string")
     if values.get("INTERARCADE_REQUIRE_WORKER_HEARTBEAT", "").lower() != "true":
         issues.append("INTERARCADE_REQUIRE_WORKER_HEARTBEAT must be true")
+    if values.get("INTERARCADE_HSTS_MAX_AGE") not in {"0", "31536000"}:
+        issues.append("INTERARCADE_HSTS_MAX_AGE must be 0 or 31536000")
     return issues
 
 
@@ -48,6 +56,8 @@ def main() -> int:
         print(f"Missing production environment file: {path}", file=sys.stderr)
         return 2
     issues = validate(dict(dotenv_values(path)))
+    if stat.S_IMODE(path.stat().st_mode) & 0o077:
+        issues.append("Production environment file must have permissions 0600 or stricter")
     for issue in issues:
         print(issue, file=sys.stderr)
     if issues:
